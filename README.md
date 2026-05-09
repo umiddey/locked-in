@@ -24,12 +24,17 @@ Built for Hyprland/Wayland but the web dashboard works anywhere.
 ## Install
 
 ```bash
-git clone https://github.com/user/locked-in.git
+git clone https://github.com/umiddey/locked-in.git
 cd locked-in
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
+chmod +x install.sh
+./install.sh
 ```
+
+The installer will:
+1. Detect and install system dependencies (Arch, Debian, Fedora).
+2. Set up a Python virtual environment.
+3. Generate and start the **systemd user services**.
+4. Create a default `config.toml` if it doesn't exist.
 
 ## Configure
 

@@ -1,0 +1,18 @@
+{% if task_metrics %}
+<div class='panel'>
+    <div class='panel__head'><span class='panel__title'>Per-Task</span></div>
+    {% for t in task_metrics %}
+    <div class="tm">
+        <span class="tm__name">
+            {% if t.task_id %}
+            <a href="/task/{{ t.task_id }}" class="sc__link">{{ t.task_name }}</a>
+            {% else %}
+            {{ t.task_name }}
+            {% endif %}
+        </span>
+        <span class="tm__val">{{ t.actual_m }}m / {{ t.est_m }}m</span>
+        <span class="tm__d tm__d--{{ t.dcls }}">{{ "%+d"|format(t.delta) }}m</span>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}

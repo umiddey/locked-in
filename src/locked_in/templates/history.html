@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}History — Locked-In{% endblock %}
+
+{% block extra_css %}
+.cal-nav{display:grid;grid-template-columns:1fr 2.5fr;gap:12px;margin-bottom:20px}
+.cal-nav__section{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:12px}
+.cal-nav__head{font-family:var(--mono);font-size:9px;font-weight:700;color:var(--dim);text-transform:uppercase;margin-bottom:8px;letter-spacing:.05em}
+.year-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.month-grid-wrap{overflow-x:auto;scrollbar-width:none}
+.month-grid-wrap::-webkit-scrollbar{display:none}
+.month-grid{display:grid;grid-template-columns:repeat(6, 1fr);grid-template-rows:1fr 1fr;gap:6px;min-width:420px}
+.nav-tile{display:block;text-decoration:none;background:var(--s2);border:1px solid var(--b1);border-radius:var(--r);padding:6px;text-align:center;font-family:var(--mono);font-size:12px;font-weight:600;color:var(--tx);transition:.1s;position:relative}
+.nav-tile:hover{background:var(--s3);border-color:var(--b2);color:var(--txh)}
+.nav-tile--active{background:var(--ambbg);border-color:var(--ambb);color:var(--ambh)}
+.nav-tile--active::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;z-index:1;border:1px solid var(--amb)}
+
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.cal__wd{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);text-align:center;padding:6px 0}
+.cal__cell{background:var(--s1);border:1px solid var(--b1);border-radius:var(--r);padding:8px 6px;min-height:64px;display:flex;flex-direction:column;align-items:center;gap:2px;transition:.15s;position:relative}
+.cal__cell--empty{background:transparent;border:none;min-height:0}
+.cal__cell--plan{cursor:pointer}
+.cal__cell--plan:hover{background:var(--s2);border-color:var(--b2)}
+.cal__cell--today{border-color:var(--ambb)}
+.cal__cell--today .cal__num{color:var(--ambh);font-weight:800}
+.cal__num{font-family:var(--mono);font-size:13px;font-weight:600;color:var(--tx)}
+.cal__dot{width:6px;height:6px;border-radius:50%;background:var(--grn);display:inline-block;margin-bottom:1px}
+.cal__label{font-family:var(--mono);font-size:9px;color:var(--dim);text-align:center;line-height:1.2}
+
+a.cal__cell, a.nav-tile{text-decoration:none;color:inherit}
+a.cal__cell::after, a.nav-tile::after{content:'';position:absolute;top:0;left:0;right:0;bottom:0;z-index:1}
+
+.legend{display:flex;gap:16px;margin-top:16px;justify-content:center}
+.legend__item{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--dim)}
+.legend__dot{width:8px;height:8px;border-radius:50%}
+.legend__dot--plan{background:var(--grn)}
+.legend__dot--today{border:2px solid var(--amb)}
+
+@media(max-width:640px){
+    .cal-nav{grid-template-columns:1fr}
+    .cal__cell{min-height:48px;padding:6px 4px}
+    .cal__label{display:none}
+}
+{% endblock %}
+
+{% block nav_right %}
+    <a href="/" class="nav__btn">&#8592; Dashboard</a>
+{% endblock %}
+
+{% block content %}
+<div class="cal-nav">
+    <div class="cal-nav__section">
+        <div class="cal-nav__head">Year</div>
+        <div class="year-grid">
+            {% for y in years %}
+            <a href="/history?year={{ y }}&month={{ current_month }}" class="nav-tile {% if y == current_year %}nav-tile--active{% endif %}">{{ y }}</a>
+            {% endfor %}
+        </div>
+    </div>
+    <div class="cal-nav__section">
+        <div class="cal-nav__head">Month</div>
+        <div class="month-grid-wrap">
+            <div class="month-grid">
+                {% for m in months %}
+                <a href="/history?year={{ current_year }}&month={{ m.value }}" class="nav-tile {% if m.value == current_month %}nav-tile--active{% endif %}">{{ m.name }}</a>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="cal-grid">
+    {% for wd in weekdays %}
+    <div class="cal__wd">{{ wd }}</div>
+    {% endfor %}
+    
+    {% for day in cal_days %}
+        {% if day.num is none %}
+            <div class="cal__cell cal__cell--empty"></div>
+        {% else %}
+            {% set cls = "" %}
+            {% if day.is_today %}{% set cls = "cal__cell--today" %}{% elif day.has_plan %}{% set cls = "cal__cell--plan" %}{% endif %}
+            
+            {% if day.can_link %}
+                <a href="/?view=historical&date={{ day.date }}" class="cal__cell {{ cls }}">
+                    {% if day.has_plan %}<span class="cal__dot"></span>{% endif %}
+                    <span class="cal__num">{{ day.num }}</span>
+                    <span class="cal__label">{{ day.label }}</span>
+                </a>
+            {% else %}
+                <div class="cal__cell {{ cls }}">
+                    {% if day.has_plan %}<span class="cal__dot"></span>{% endif %}
+                    <span class="cal__num">{{ day.num }}</span>
+                    <span class="cal__label">{{ day.label }}</span>
+                </div>
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+</div>
+
+<div class="legend">
+    <div class="legend__item"><span class="legend__dot legend__dot--plan"></span>Has plan</div>
+    <div class="legend__item"><span class="legend__dot legend__dot--today"></span>Today</div>
+</div>
+{% endblock %}

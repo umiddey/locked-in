@@ -1,0 +1,23 @@
+<div class="hero {{ hero_cls }}">
+    <div class="hero__top">
+        <span class="tag tag--{{ hero_cls.split('--')[1] }}">{{ hero_label }}</span>
+        <span class="hero__meta">{{ hero_meta|safe }}</span>
+    </div>
+    <div class="hero__name">{{ hero_name }}</div>
+    {% if hero_detail %}
+    <div class="hero__detail {{ 'hero__detail--paused' if runtime_status == 'paused' }}">
+        {{ hero_detail|safe }}
+    </div>
+    {% endif %}
+    <div class="hero__bar">
+        <div class="hero__prog"><div class="hero__prog-fill" style="width:{{ pct }}%"></div></div>
+        <span class="hero__prog-label">{{ completed_str }}</span>
+    </div>
+    {% if next_task %}
+    <div class="hero__next">
+        <span class="tag tag--dim">NEXT</span>
+        <span class="hero__next-name">{{ next_task.task_name }}</span>
+        <span class="hero__next-time">{{ next_task.projected_start[11:16] }}</span>
+    </div>
+    {% endif %}
+</div>

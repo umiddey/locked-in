@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}Settings — Locked-In{% endblock %}
+
+{% block extra_css %}
+h1{font-family:var(--sans);font-size:22px;font-weight:700;color:var(--txh);margin-bottom:20px}
+.section{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:20px 24px;margin-bottom:16px}
+.section__title{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--amb);margin-bottom:14px}
+.field{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid var(--b1)}
+.field:last-child{border-bottom:none}
+.field__label{font-family:var(--sans);font-size:13px;color:var(--tx)}
+.field__hint{font-family:var(--mono);font-size:10px;color:var(--dim);grid-column:1/-1;padding-top:2px}
+.field input[type="number"],.field input[type="text"]{background:var(--s2);border:1px solid var(--b1);color:var(--tx);padding:6px 10px;border-radius:var(--r);font-family:var(--mono);font-size:13px;width:100%;text-align:right}
+.field input:focus{outline:none;border-color:var(--ambb)}
+.field input[type="checkbox"]{width:18px;height:18px;accent-color:var(--amb);justify-self:end}
+.actions{display:flex;gap:10px;margin-top:20px}
+{% endblock %}
+
+{% block nav_right %}
+    <a href="/" class="nav__btn">&#8592; Dashboard</a>
+{% endblock %}
+
+{% block banner %}
+    {% if message %}
+    <div class="ban {{ 'ban--err' if is_error else '' }}">{{ message }}</div>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<h1>Settings</h1>
+
+<form method="post" action="/settings">
+<div class="section">
+    <div class="section__title">Break Schedule</div>
+    <div class="field">
+        <label class="field__label">Work interval</label>
+        <input type="number" name="schedule__stretch_interval_minutes" value="{{ config.schedule.stretch_interval_minutes }}" min="1" max="480" />
+        <div class="field__hint">Minutes of continuous work before a break is enforced</div>
+    </div>
+    <div class="field">
+        <label class="field__label">Break duration</label>
+        <input type="number" name="schedule__stretch_duration_minutes" value="{{ config.schedule.stretch_duration_minutes }}" min="1" max="60" />
+        <div class="field__hint">Minutes you must take a break for</div>
+    </div>
+</div>
+
+<div class="section">
+    <div class="section__title">Shutdown</div>
+    <div class="field">
+        <label class="field__label">Hard shutdown time</label>
+        <input type="text" name="schedule__hard_shutdown_time" value="{{ config.schedule.hard_shutdown_time }}" placeholder="HH:MM" />
+        <div class="field__hint">Time of day to force shutdown (24h format)</div>
+    </div>
+    <div class="field">
+        <label class="field__label">Shutdown warning</label>
+        <input type="number" name="schedule__shutdown_warning_minutes" value="{{ config.schedule.shutdown_warning_minutes }}" min="0" max="120" />
+        <div class="field__hint">Minutes of warning before hard shutdown</div>
+    </div>
+    <div class="field">
+        <label class="field__label">Enabled</label>
+        <input type="checkbox" name="schedule__hard_shutdown_enabled" value="on" {{ 'checked' if config.schedule.hard_shutdown_enabled else '' }} />
+    </div>
+</div>
+
+<div class="section">
+    <div class="section__title">Task Rules</div>
+    <div class="field">
+        <label class="field__label">Start grace period</label>
+        <input type="number" name="warden__task_start_grace_seconds" value="{{ config.warden.task_start_grace_seconds }}" min="0" max="3600" />
+        <div class="field__hint">Seconds after task starts before enforcement kicks in</div>
+    </div>
+    <div class="field">
+        <label class="field__label">Default extend duration</label>
+        <input type="number" name="warden__default_extend_minutes" value="{{ config.warden.default_extend_minutes }}" min="0" max="120" />
+        <div class="field__hint">Minutes to add when clicking 'Extend' in popup (0 = use task's original estimate)</div>
+    </div>
+    <div class="field">
+        <label class="field__label">Give-up cooldown</label>
+        <input type="number" name="warden__give_up_cooldown_seconds" value="{{ config.warden.give_up_cooldown_seconds }}" min="0" max="3600" />
+        <div class="field__hint">Seconds between give-up attempts</div>
+    </div>
+</div>
+
+<div class="section">
+    <div class="section__title">Idle Auto-Pause</div>
+    <div class="field">
+        <label class="field__label">Idle timeout</label>
+        <input type="number" name="auto_pause__idle_pause_seconds" value="{{ config.auto_pause.idle_pause_seconds }}" min="0" max="3600" />
+        <div class="field__hint">Seconds of no keyboard/mouse activity before auto-pausing (0 = disabled)</div>
+    </div>
+    <div class="field">
+        <label class="field__label">Resume grace</label>
+        <input type="number" name="auto_pause__idle_resume_grace_seconds" value="{{ config.auto_pause.idle_resume_grace_seconds }}" min="1" max="30" />
+        <div class="field__hint">Seconds of activity before auto-resuming from idle pause</div>
+    </div>
+</div>
+
+<div class="section">
+    <div class="section__title">Startup</div>
+    <div class="field">
+        <label class="field__label">Open dashboard on login</label>
+        <input type="checkbox" name="open_dashboard_on_login" value="on" {{ 'checked' if auto_open_enabled else '' }} />
+        <div class="field__hint">Open the web dashboard in your browser when you log in (Hyprland)</div>
+    </div>
+</div>
+
+<div class="actions">
+    <button class="btn btn--primary" type="submit">Save Settings</button>
+    <a href="/" class="btn">Cancel</a>
+</div>
+</form>
+{% endblock %}

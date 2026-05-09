@@ -1,0 +1,16 @@
+<div class="actions">
+    {% for action in actions %}
+    <form method="post" action="{{ action.url }}" {% if action.fragment %}data-fragment{% endif %} class="{{ action.form_class }}">
+        <input type="hidden" name="date" value="{{ target_date_iso }}" />
+        {% if historical_view %}<input type="hidden" name="view" value="historical" />{% endif %}
+        
+        {% if action.notes %}
+        <textarea name="notes" class="act-notes" placeholder="{{ action.notes_placeholder }}" rows="2"></textarea>
+        {% endif %}
+        
+        <button class="act {{ action.btn_class }}" type="submit">
+            {{ action.label|safe }}
+        </button>
+    </form>
+    {% endfor %}
+</div>

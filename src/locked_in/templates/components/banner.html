@@ -1,0 +1,11 @@
+{% if message %}
+<div class="ban {{ 'ban--err' if is_error else '' }} {{ 'ban--info' if historical_view else '' }}">
+    {{ message }}
+</div>
+{% endif %}
+{% if bootstrap_error %}
+<div class="ban ban--err">Daemon bootstrap failed: {{ bootstrap_error }}</div>
+{% endif %}
+{% if historical_view %}
+<div class="ban ban--info">{{ planning_label }}: {{ target_date_display }}</div>
+{% endif %}

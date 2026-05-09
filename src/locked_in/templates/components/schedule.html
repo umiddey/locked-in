@@ -1,0 +1,36 @@
+<div class="panel">
+    <div class="panel__head">
+        <span class="panel__title">Schedule</span>
+        <span class="panel__badge">{{ schedule|length }}</span>
+    </div>
+    {% if not schedule %}
+    <div class="empty">No schedule. Save a plan first.</div>
+    {% else %}
+        {% for entry in schedule %}
+        <div class="sc {{ entry.cls }}">
+            <div class="sc__time">{{ entry.t0 }}<span class="sc__sep">&mdash;</span>{{ entry.t1 }}</div>
+            <div class="sc__body">
+                <div class="sc__name">
+                    {% if entry.task_id %}
+                    <a href="/task/{{ entry.task_id }}" class="sc__link">{{ entry.task_name }}</a>
+                    {% else %}
+                    {{ entry.task_name }}
+                    {% endif %}
+                    {% if entry.pause_tag %}<span class="tag tag--amber">{{ entry.pause_tag }}</span>{% endif %}
+                </div>
+                {% if entry.work_tag %}<span class="sc__work">{{ entry.work_tag }}</span>{% endif %}
+            </div>
+            <div class="sc__est">{{ entry.duration_minutes }}m</div>
+            {% if entry.task_id and entry.status == "pending" %}
+            <div class="sc__act">
+                <form method="post" action="/task/delete" onsubmit="return confirm('Delete this task?')">
+                    <input type="hidden" name="date" value="{{ target_date_iso }}" />
+                    <input type="hidden" name="task_id" value="{{ entry.task_id }}"/>
+                    <button class="sc__del" type="submit" title="Delete">&times;</button>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% endif %}
+</div>

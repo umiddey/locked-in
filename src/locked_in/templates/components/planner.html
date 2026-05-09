@@ -1,0 +1,32 @@
+<details class="planner panel" {{ 'open' if not plan_exists else '' }}>
+    <summary>Planner &mdash; {{ target_date_display }}</summary>
+    <div style="padding:14px 16px">
+        <form method="post" action="/plan">
+            <div style="margin-bottom:10px">
+                {% if not historical_view %}
+                <span class="plan__date-val">{{ target_date_display }}</span>
+                <input type="hidden" name="date" value="{{ target_date_iso }}" />
+                {% else %}
+                <input type="date" name="date" value="{{ target_date_iso }}" class="plan__date-input" />
+                <input type="hidden" name="view" value="historical" />
+                {% endif %}
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span class="panel__title" style="margin:0">Tasks</span>
+                <button class="btn btn--ghost" type="button" id="add-task-row">+ Add</button>
+            </div>
+            <div id="task-editor" class="task-editor">
+                {{ editor_rows_html|safe }}
+            </div>
+            <template id="task-row-template">{{ editor_template_html|safe }}</template>
+            <details class="raw-import">
+                <summary>Raw text import</summary>
+                <textarea name="tasks" spellcheck="false" placeholder="Task name - 30">{{ tasks_text }}</textarea>
+            </details>
+            <div style="display:flex;gap:6px;margin-top:12px">
+                <button class="btn btn--primary" type="submit" name="intent" value="save">Save</button>
+                <button class="btn btn--green" type="submit" name="intent" value="save_start">Save + Start</button>
+            </div>
+        </form>
+    </div>
+</details>

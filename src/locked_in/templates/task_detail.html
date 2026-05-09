@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block title %}{{ task_name }} — Locked-In{% endblock %}
+
+{% block extra_css %}
+.hero{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);padding:28px 32px;margin-bottom:16px}
+.hero__date{font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:6px}
+.hero__name{font-size:28px;font-weight:800;letter-spacing:-.02em;color:var(--txh);line-height:1.15;margin-bottom:8px}
+.hero__status{font-family:var(--mono);font-size:12px;color:var(--dim);margin-bottom:16px}
+
+.mbar{display:flex;gap:1px;background:var(--b1);border-radius:var(--rl);overflow:hidden;margin-bottom:16px}
+.mbar__cell{flex:1;background:var(--s1);padding:14px 16px;text-align:center}
+.mbar__val{font-family:var(--mono);font-size:22px;font-weight:800;color:var(--txh);line-height:1;margin-bottom:3px}
+.mbar__lbl{font-family:var(--mono);font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+.mbar__sub{font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:2px}
+
+.tm__d{font-family:var(--mono);font-weight:700;padding:1px 6px;border-radius:3px;white-space:nowrap;font-size:12px}
+.tm__d--over{background:var(--redbg);color:var(--redh)}
+.tm__d--under{background:var(--grnbg);color:var(--grnh)}
+.tm__d--on{background:var(--s3);color:var(--dim)}
+
+.tl-bar-wrap{padding:16px}
+.tl-times{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:6px}
+.tl-bar{display:flex;height:28px;border-radius:6px;overflow:hidden;gap:1px;background:var(--b1)}
+.tc{transition:opacity .15s;cursor:pointer}
+.tc:hover{opacity:.8;outline:1px solid #fff}
+.tc--work{background:linear-gradient(180deg,var(--grnh),var(--grn))}
+.tc--pause{background:linear-gradient(180deg,var(--ambh),var(--amb))}
+.tc--call{background:linear-gradient(180deg,#aa88ee,var(--purp))}
+.tc--idle{background:linear-gradient(180deg,#777,var(--dim))}
+.tc--other{background:var(--dim)}
+.tl-legend{display:flex;gap:14px;margin-top:10px;justify-content:center}
+.tl-dot{display:inline-block;width:10px;height:10px;border-radius:3px}
+.tl-leg{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:10px;color:var(--dim);font-weight:600;letter-spacing:.05em;text-transform:uppercase}
+
+.detail-panel{background:var(--s2);border-top:1px solid var(--b1);padding:12px 16px;display:none}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.detail-item{display:flex;flex-direction:column;gap:2px}
+.detail-lbl{font-family:var(--mono);font-size:9px;color:var(--dim);text-transform:uppercase}
+.detail-val{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--txh)}
+
+.notes-list{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.note-entry{background:var(--s2);border-left:3px solid var(--amb);padding:10px 12px;border-radius:0 var(--r) var(--r) 0;font-family:var(--mono);font-size:12px;line-height:1.4;white-space:pre-wrap;color:var(--tx)}
+.note-entry span{color:var(--dim);font-weight:700;display:block;margin-bottom:4px;font-size:10px}
+
+.act-notes{font-family:var(--mono);font-size:11px;padding:6px 10px;border-radius:var(--r);border:1px solid var(--b2);background:var(--s2);color:var(--tx);resize:vertical;min-height:36px;width:100%}
+.act-notes:focus{outline:none;border-color:var(--ambb)}
+
+@media(max-width:640px){
+    .shell{padding:12px 10px 60px}
+    .hero{padding:20px 18px}
+    .hero__name{font-size:22px}
+    .tl-bar{height:22px}
+    .tl-bar-wrap{padding:12px 10px}
+    .mbar{flex-wrap:wrap}
+    .mbar__cell{min-width:calc(50% - 1px)}
+}
+{% endblock %}
+
+{% block nav_right %}
+    <a href="{{ back_url }}" class="nav__btn">&#8592; Back</a>
+{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <div class="hero__date">{{ target_date }}</div>
+    <div class="hero__name">{{ task_name }}</div>
+    <div class="hero__status">{{ completed_status }} &middot; #{{ position + 1 }} in plan &middot; Est. {{ est_m }}m</div>
+</div>
+
+<div class="mbar">
+    <div class="mbar__cell">
+        <div class="mbar__val">{{ work_m }}m</div>
+        <div class="mbar__lbl">Work</div>
+        <div class="mbar__sub">{{ work_s }}s extra</div>
+    </div>
+    <div class="mbar__cell">
+        <div class="mbar__val">{{ pause_m }}m</div>
+        <div class="mbar__lbl">Paused</div>
+        <div class="mbar__sub">{{ pause_s }}s extra</div>
+    </div>
+    <div class="mbar__cell">
+        <div class="mbar__val">{{ wall_m }}m</div>
+        <div class="mbar__lbl">Wall</div>
+    </div>
+    <div class="mbar__cell">
+        <div class="mbar__val"><span class="tm__d tm__d--{{ delta_cls }}">{{ "%+d"|format(delta) }}m</span></div>
+        <div class="mbar__lbl">vs Est</div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel__head">
+        <span class="panel__title">Timeline</span>
+        <span class="panel__badge">{{ block_count }} segments</span>
+    </div>
+    <div class="tl-bar-wrap">
+        <div class="tl-times"><span>{{ first_start }}</span><span>{{ last_end }}</span></div>
+        <div class="tl-bar">
+            {% for b in timeline %}
+            <div class="tc tc--{{ b.type }}" style="width:{{ b.pct }}%" 
+                 data-label="{{ b.label }}" data-start="{{ b.start }}" data-end="{{ b.end }}" data-dur="{{ b.dur_disp }}"></div>
+            {% endfor %}
+        </div>
+        <div class="tl-legend">
+            <span class="tl-leg"><span class="tl-dot tc--work"></span>Work</span>
+            <span class="tl-leg"><span class="tl-dot tc--pause"></span>Pause</span>
+            <span class="tl-leg"><span class="tl-dot tc--call"></span>Call</span>
+            <span class="tl-leg"><span class="tl-dot tc--idle"></span>Idle</span>
+        </div>
+    </div>
+    <div id="segment-detail" class="detail-panel">
+        <div class="detail-grid">
+            <div class="detail-item"><span class="detail-lbl">Type</span><span class="detail-val" id="det-type">-</span></div>
+            <div class="detail-item"><span class="detail-lbl">Interval</span><span class="detail-val" id="det-interval">-</span></div>
+            <div class="detail-item"><span class="detail-lbl">Duration</span><span class="detail-val" id="det-dur">-</span></div>
+        </div>
+    </div>
+</div>
+
+<div id="notes-section-container">
+    {% include "components/notes.html" %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+document.querySelectorAll('.tc').forEach(el => {
+    el.addEventListener('click', () => {
+        const panel = document.getElementById('segment-detail');
+        panel.style.display = 'block';
+        document.getElementById('det-type').textContent = el.dataset.label;
+        document.getElementById('det-interval').textContent = el.dataset.start + ' - ' + el.dataset.end;
+        document.getElementById('det-dur').textContent = el.dataset.dur;
+    });
+});
+
+// Fragment intercept
+document.addEventListener('submit', async (e) => {
+    const form = e.target;
+    if (!form.dataset.fragment) return;
+    e.preventDefault();
+    const body = new FormData(form);
+    body.set('fragment', '1');
+    try {
+        const resp = await fetch(form.action, { method: 'POST', body });
+        if (resp.ok) {
+            const data = await resp.json();
+            if (data.notes) {
+                const container = document.getElementById('notes-section-container');
+                if (container) container.innerHTML = data.notes;
+                const badge = document.getElementById('notes-saved-badge');
+                if (badge) {
+                    badge.style.display = 'inline';
+                    setTimeout(() => badge.style.display = 'none', 2000);
+                }
+                // Clear textarea
+                const txt = container.querySelector('textarea');
+                if (txt) txt.value = '';
+            }
+        }
+    } catch (err) { console.error(err); }
+});
+{% endblock %}

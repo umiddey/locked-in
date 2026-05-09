@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>{% block title %}Locked-In{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com"/>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+    <style>
+        :root {
+            color-scheme:dark;
+            --bg:#06070a;--s1:#0c0e14;--s2:#12151d;--s3:#191d28;
+            --b1:#1a1f2e;--b2:#252b3d;
+            --tx:#ccc8be;--txh:#eae6dc;--dim:#585e72;
+            --grn:#2fac6a;--grnh:#44d88a;--grnbg:rgba(47,172,106,.08);--grnb:rgba(47,172,106,.22);
+            --amb:#d4a039;--ambh:#eab94e;--ambbg:rgba(212,160,57,.07);--ambb:rgba(212,160,57,.18);
+            --red:#c04040;--redh:#e55;--redbg:rgba(192,64,64,.08);--redb:rgba(192,64,64,.22);
+            --blu:#4488bb;--blubg:rgba(68,136,187,.08);--blub:rgba(68,136,187,.22);
+            --purp:#8866cc;--purpbg:rgba(136,102,204,.08);--purpb:rgba(136,102,204,.22);
+            --mono:'JetBrains Mono',monospace;--sans:'Outfit',system-ui,sans-serif;
+            --r:6px;--rl:10px;
+        }
+        *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1.5;-webkit-font-smoothing:antialiased}
+        .shell{max-width:860px;margin:0 auto;padding:20px 16px 80px}
+        form{margin:0;display:inline}
+
+        /* NAV */
+        .nav{display:flex;align-items:center;justify-content:space-between;padding:12px 0 16px;border-bottom:1px solid var(--b1);margin-bottom:20px}
+        .nav__brand{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--amb);letter-spacing:.08em;text-transform:uppercase;text-decoration:none}
+        .nav__r{display:flex;align-items:center;gap:10px}
+        .nav__btn{appearance:none;background:var(--s2);border:1px solid var(--b1);color:var(--dim);font-family:var(--mono);font-size:11px;font-weight:500;padding:5px 12px;border-radius:var(--r);cursor:pointer;transition:.15s;text-decoration:none}
+        .nav__btn:hover{background:var(--s3);color:var(--tx);border-color:var(--b2)}
+        .nav__btn--accent{color:var(--amb);border-color:var(--ambb)}
+        .dot{width:7px;height:7px;border-radius:50%;display:inline-block}
+        .dot--on{background:var(--grnh);box-shadow:0 0 6px var(--grn)}
+        .dot--off{background:var(--red);box-shadow:0 0 6px rgba(192,64,64,.4)}
+        .clock{font-family:var(--mono);font-size:12px;color:var(--dim);letter-spacing:.04em}
+
+        /* BANNER */
+        .ban{font-family:var(--mono);font-size:12px;padding:8px 14px;border-radius:var(--r);margin-bottom:12px;border:1px solid var(--ambb);background:var(--ambbg);color:var(--ambh)}
+        .ban--err{border-color:var(--redb);background:var(--redbg);color:var(--redh)}
+        .ban--info{border-color:var(--blub);background:var(--blubg);color:var(--blu)}
+
+        /* COMMON PANELS */
+        .panel{background:var(--s1);border:1px solid var(--b1);border-radius:var(--rl);overflow:hidden;margin-bottom:16px}
+        .panel__head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--b1)}
+        .panel__title{font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+        .panel__badge{font-family:var(--mono);font-size:10px;color:var(--dim);background:var(--s2);padding:2px 7px;border-radius:4px}
+        
+        .btn{appearance:none;font-family:var(--mono);font-size:11px;font-weight:700;padding:8px 14px;border-radius:var(--r);border:1px solid var(--b1);background:var(--s2);color:var(--tx);cursor:pointer;transition:.15s}
+        .btn:hover{background:var(--s3);border-color:var(--b2)}
+        .btn--primary{background:var(--amb);border-color:var(--amb);color:#0a0a0a}
+        .btn--primary:hover{background:var(--ambh)}
+        
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+    <div class="shell">
+        <nav class="nav">
+            <a href="/" class="nav__brand">Locked-In</a>
+            <div class="nav__r">
+                {% block nav_right %}
+                {% endblock %}
+            </div>
+        </nav>
+
+        <div id="banner-section">
+            {% block banner %}{% endblock %}
+        </div>
+
+        {% block content %}{% endblock %}
+
+        <div class="foot">
+            {% block footer %}{% endblock %}
+        </div>
+    </div>
+
+    <script>
+        (() => {
+            const c = document.getElementById("clock");
+            if (c) {
+                const t = () => { c.textContent = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) };
+                t(); setInterval(t, 1000);
+            }
+            {% block extra_js %}{% endblock %}
+        })();
+    </script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+<div id="notes-section" class="panel">
+    <div class="panel__head">
+        <span class="panel__title">Notes</span>
+        <span class="panel__badge" id="notes-saved-badge" style="display:none">saved</span>
+    </div>
+    <div style="padding:14px 16px">
+        <div class="notes-list">
+            {% for entry in notes_entries %}
+            <div class="note-entry">
+                {% if entry.timestamp %}<span>{{ entry.timestamp }}</span>{% endif %}
+                {{ entry.text }}
+            </div>
+            {% endfor %}
+        </div>
+        <form method="post" action="/task/notes" data-fragment>
+            <input type="hidden" name="task_id" value="{{ task_id }}" />
+            <input type="hidden" name="date" value="{{ target_date_iso }}" />
+            <textarea name="notes" class="act-notes" placeholder="Add a new note..." rows="3"></textarea>
+            <div style="margin-top:8px">
+                <button class="btn btn--primary" type="submit">Add Note</button>
+            </div>
+        </form>
+    </div>
+</div>
