@@ -1,5 +1,5 @@
 import time
-from focus_warden.idle_detector import IdleDetector
+from locked_in.idle_detector import IdleDetector
 
 def test_idle_detector_soft_hard_split():
     # We can't easily mock /proc/interrupts without monkeypatching 'open'

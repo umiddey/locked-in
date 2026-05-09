@@ -1,6 +1,6 @@
-# Focus Warden
+# Locked-In
 
-A Linux desktop focus enforcer. Plan your tasks, start a session, and let the warden keep you honest — enforced breaks, hard shutdowns, and a web dashboard to track it all.
+A Linux desktop focus enforcer. Plan your tasks, start a session, and stay **Locked-In** — enforced breaks, hard shutdowns, and a web dashboard to track it all.
 
 Built for Hyprland/Wayland but the web dashboard works anywhere.
 
@@ -24,8 +24,8 @@ Built for Hyprland/Wayland but the web dashboard works anywhere.
 ## Install
 
 ```bash
-git clone https://github.com/user/focus-warden.git
-cd focus-warden
+git clone https://github.com/user/locked-in.git
+cd locked-in
 python -m venv .venv
 source .venv/bin/activate
 pip install -e .
@@ -57,7 +57,7 @@ Key settings in `config.toml`:
 **Web dashboard only:**
 
 ```bash
-focus-warden web
+locked-in web
 ```
 
 Open `http://localhost:8765` in your browser.
@@ -65,7 +65,7 @@ Open `http://localhost:8765` in your browser.
 **Full daemon (break enforcement + blocker window):**
 
 ```bash
-focus-warden run-legacy
+locked-in run-legacy
 ```
 
 ## Auto-start on login
@@ -74,11 +74,11 @@ Install the systemd user services:
 
 ```bash
 mkdir -p ~/.config/systemd/user
-cp systemd/focus-warden.service ~/.config/systemd/user/
-cp systemd/focus-warden-web.service ~/.config/systemd/user/
+cp systemd/locked-in.service ~/.config/systemd/user/
+cp systemd/locked-in-web.service ~/.config/systemd/user/
 systemctl --user daemon-reload
-systemctl --user enable --now focus-warden.service
-systemctl --user enable --now focus-warden-web.service
+systemctl --user enable --now locked-in.service
+systemctl --user enable --now locked-in-web.service
 ```
 
 **Note:** Edit the `ExecStart` path in the service files if your install location differs from `~/.local/bin/`.
@@ -86,25 +86,25 @@ systemctl --user enable --now focus-warden-web.service
 ### Auto-open dashboard on login (Hyprland)
 
 ```bash
-focus-warden auto-open-on   # adds exec-once to Hyprland autostart
-focus-warden auto-open-off  # removes it
+locked-in auto-open-on   # adds exec-once to Hyprland autostart
+locked-in auto-open-off  # removes it
 ```
 
 ## CLI commands
 
 | Command | Description |
 |---------|-------------|
-| `focus-warden run` | Start the simple app |
-| `focus-warden web` | Start the web dashboard |
-| `focus-warden run-legacy` | Start the full daemon |
-| `focus-warden pause` | Pause current task |
-| `focus-warden resume` | Resume current task |
-| `focus-warden give-up` | Give up for the day |
-| `focus-warden status` | Show daemon status |
-| `focus-warden fetch-tasks` | List today's tasks |
-| `focus-warden show-schedule` | Print today's schedule |
-| `focus-warden auto-open-on` | Enable browser auto-open on login |
-| `focus-warden auto-open-off` | Disable browser auto-open on login |
+| `locked-in run` | Start the simple app |
+| `locked-in web` | Start the web dashboard |
+| `locked-in run-legacy` | Start the full daemon |
+| `locked-in pause` | Pause current task |
+| `locked-in resume` | Resume current task |
+| `locked-in give-up` | Give up for the day |
+| `locked-in status` | Show daemon status |
+| `locked-in fetch-tasks` | List today's tasks |
+| `locked-in show-schedule` | Print today's schedule |
+| `locked-in auto-open-on` | Enable browser auto-open on login |
+| `locked-in auto-open-off` | Disable browser auto-open on login |
 
 ## License
 

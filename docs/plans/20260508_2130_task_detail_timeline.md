@@ -32,7 +32,7 @@ Added `SimpleTodoStore.get_task_detail(plan_task_id)` that:
 - Computes total work/pause/wall seconds
 - Returns events and runtimes for the events log
 
-**File:** `src/focus_warden/simple_store.py` (added ~100 lines)
+**File:** `src/locked_in/simple_store.py` (added ~100 lines)
 
 ## Phase 2 — API + HTML Route ✅
 
@@ -41,7 +41,7 @@ Added to `web_frontend.py`:
 - GET `/api/task/<id>` → JSON payload
 - Route matching via `re.match(r"^/task/(\d+)$", ...)`
 
-**File:** `src/focus_warden/web_frontend.py`
+**File:** `src/locked_in/web_frontend.py`
 
 ## Phase 3 — Task Detail Page ✅
 
@@ -81,5 +81,5 @@ curl -s http://localhost:8765/ | grep -c '/task/'
 
 ## Files Modified
 
-- `src/focus_warden/simple_store.py`: +`get_task_detail()` method
-- `src/focus_warden/web_frontend.py`: +task detail route, +detail page renderer, +404 helper, clickable schedule names, clickable metrics names
+- `src/locked_in/simple_store.py`: +`get_task_detail()` method
+- `src/locked_in/web_frontend.py`: +task detail route, +detail page renderer, +404 helper, clickable schedule names, clickable metrics names

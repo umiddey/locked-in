@@ -8,8 +8,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from focus_warden.simple_store import SimpleTodoStore, TaskDraft
-from focus_warden.web_frontend import FocusWardenWebFrontend
+from locked_in.simple_store import SimpleTodoStore, TaskDraft
+from locked_in.web_frontend import LockedInWebFrontend
 
 
 class HistoricalPlannerViewTests(unittest.TestCase):
@@ -25,7 +25,7 @@ class HistoricalPlannerViewTests(unittest.TestCase):
         self.store.save_plan(self.two_days_ago, [TaskDraft("Older", 15)])
         self.store.save_plan(self.yesterday, [TaskDraft("Latest historical", 25)])
 
-        self.frontend = FocusWardenWebFrontend("/tmp/no.sock", store=self.store)
+        self.frontend = LockedInWebFrontend("/tmp/no.sock", store=self.store)
         self.frontend._metrics_payload = lambda target_date: {
             "focus_seconds": 0, "pause_seconds": 0, "call_seconds": 0,
             "planned_seconds": 0, "by_task": [],

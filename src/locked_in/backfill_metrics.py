@@ -6,7 +6,7 @@ import json
 from .simple_store import SimpleTodoStore
 
 
-LEGACY_DB_PATH = Path.home() / ".local" / "share" / "focus-warden" / "warden.db"
+LEGACY_DB_PATH = Path.home() / ".local" / "share" / "locked-in" / "warden.db"
 
 
 def backfill_all(store: SimpleTodoStore) -> dict:

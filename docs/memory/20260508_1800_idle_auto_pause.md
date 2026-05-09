@@ -21,10 +21,10 @@
 - /dev/input approach: zero external deps, works on Wayland/Hyprland
 - Background thread: avoids blocking the Qt event loop
 ## FILES MODIFIED
-- src/focus_warden/idle_detector.py: new module (background thread input monitor)
-- src/focus_warden/config.py: added idle_pause_seconds, idle_resume_grace_seconds to AutoPauseConfig
-- src/focus_warden/daemon.py: wired IdleDetector into __init__, run, _tick loop, added _poll_idle_pause method
-- src/focus_warden/web_frontend.py: added auto_pause fields to settings form + save handler
+- src/locked_in/idle_detector.py: new module (background thread input monitor)
+- src/locked_in/config.py: added idle_pause_seconds, idle_resume_grace_seconds to AutoPauseConfig
+- src/locked_in/daemon.py: wired IdleDetector into __init__, run, _tick loop, added _poll_idle_pause method
+- src/locked_in/web_frontend.py: added auto_pause fields to settings form + save handler
 - config.toml: added idle_pause_seconds=60, idle_resume_grace_seconds=3
 - config.example.toml: same
 ## NEXT SESSION

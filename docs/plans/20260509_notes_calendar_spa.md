@@ -1,4 +1,4 @@
-# Focus Warden: Retroactive Notes + Calendar History + SPA Fragment Rendering
+# Locked-In: Retroactive Notes + Calendar History + SPA Fragment Rendering
 **Implementation Status: Phases 2+3 DONE, 4+5 DONE**
 
 ## Context
@@ -27,7 +27,7 @@ The JS intercepts form submissions, sends via `fetch()`, and swaps the returned 
 ---
 
 ## Phase 1: Store methods for retroactive notes + date queries
-**File: `src/focus_warden/simple_store.py`**
+**File: `src/locked_in/simple_store.py`**
 
 ### 1a. `update_task_run_notes(plan_task_id: int, notes: str) -> bool`
 ```python
@@ -111,7 +111,7 @@ def get_day_summary(self, target_date: date) -> dict:
 ---
 
 ## Phase 2: Fragment rendering helpers
-**File: `src/focus_warden/web_frontend.py`**
+**File: `src/locked_in/web_frontend.py`**
 
 ### 2a. Add wrapper div IDs to existing render output
 The main `_render_page` output needs IDs on key sections so JS can target them for swapping:
@@ -195,7 +195,7 @@ This applies to all POST routes: `/run/pause`, `/run/resume`, `/run/extend`, `/r
 ---
 
 ## Phase 3: Client-side JS for fragment swapping
-**File: `src/focus_warden/web_frontend.py`** (inline in the `<script>` tag at bottom of `_render_page`)
+**File: `src/locked_in/web_frontend.py`** (inline in the `<script>` tag at bottom of `_render_page`)
 
 ~40 lines of vanilla JS:
 
@@ -224,7 +224,7 @@ All action forms get `data-fragment` attribute added in the HTML rendering. This
 ---
 
 ## Phase 4: Retroactive notes on task detail page
-**File: `src/focus_warden/web_frontend.py`**
+**File: `src/locked_in/web_frontend.py`**
 
 ### 4a. POST `/task/notes` handler in `do_POST`
 ```python
@@ -295,7 +295,7 @@ def _render_notes_fragment(self, detail: dict) -> str:
 ---
 
 ## Phase 5: Calendar historical view
-**File: `src/focus_warden/web_frontend.py`**
+**File: `src/locked_in/web_frontend.py`**
 
 ### 5a. GET `/history` route in `_dispatch`
 ```python
@@ -336,7 +336,7 @@ Change the "History" button in `_render_page`:
 ---
 
 ## Phase 6: Refactor `_render_page` to use fragments
-**File: `src/focus_warden/web_frontend.py`**
+**File: `src/locked_in/web_frontend.py`**
 
 This is the key deduplication step. Currently `_render_page` is ~500 lines of inline HTML building. Refactor so:
 
@@ -349,8 +349,8 @@ This is a pure refactor — no behavior change for full page loads.
 ---
 
 ## Files Modified
-1. **`src/focus_warden/simple_store.py`** — add `update_task_run_notes`, `get_plan_dates_range`, `get_day_summary`
-2. **`src/focus_warden/web_frontend.py`** — fragment rendering, `/task/notes` POST, `/history` GET, JS interceptor, calendar page, refactor `_render_page`
+1. **`src/locked_in/simple_store.py`** — add `update_task_run_notes`, `get_plan_dates_range`, `get_day_summary`
+2. **`src/locked_in/web_frontend.py`** — fragment rendering, `/task/notes` POST, `/history` GET, JS interceptor, calendar page, refactor `_render_page`
 3. **`tests/test_web_frontend.py`** — add tests for notes update, calendar page, fragment responses
 
 ## Implementation Order
@@ -363,11 +363,11 @@ This is a pure refactor — no behavior change for full page loads.
 
 ## Verification
 1. `python -m pytest tests/test_web_frontend.py -v` — all existing tests pass + new tests
-2. `focus-warden web` — start server
+2. `locked-in web` — start server
 3. **Fragment SPA**: On today's dashboard, click Pause → hero updates without page reload. Click Resume → updates again. Click Finish with notes → task completes, schedule updates, metrics update, all without reload.
 4. **Retroactive notes**: Navigate to `/task/11` (a completed past task). See notes panel. Type notes, click Save → notes saved without reload. Refresh page → notes persist.
 5. **Calendar**: Navigate to `/history`. See May 2026 calendar. Green dots on dates 4-9. Click on 2026-05-06 → loads historical dashboard for that date with 3 tasks. Navigate to April 2026 → no green dots (no plans). Navigate back to May.
-6. **DB check**: `sqlite3 ~/.local/share/focus-warden/simple_todos.db "SELECT id, notes FROM task_runs WHERE notes IS NOT NULL LIMIT 5;"`
+6. **DB check**: `sqlite3 ~/.local/share/locked-in/simple_todos.db "SELECT id, notes FROM task_runs WHERE notes IS NOT NULL LIMIT 5;"`
 
 ## Thought Process
 User started by asking to understand the codebase, then identified three pain points: no retroactive notes, useless historical view (one day), and wanted app-like feel. We discussed SPA approaches — full SPA rewrite was overkill for a local single-user dashboard. htmx-style fragment rendering is the sweet spot: server already renders HTML, so we just return fragments instead of full pages. The existing `/api/*` JSON endpoints confirmed the architecture was ready for this. The calendar was straightforward — just needed a new store query method and a page renderer. The refactoring of `_render_page` into composable fragments is the key architectural change that makes everything else work without duplication.

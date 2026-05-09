@@ -26,7 +26,7 @@ class EtaWarningPopup(QWidget):
         self.on_decision = on_decision
         self.estimated_minutes = estimated_minutes
 
-        self.setWindowTitle("Focus Warden — Time's Up")
+        self.setWindowTitle("Locked-In — Time's Up")
         self.setWindowFlags(
             Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.FramelessWindowHint

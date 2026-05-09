@@ -16,7 +16,7 @@ from .simple_store import DEFAULT_TASK_DURATION_MINUTES, EditableTaskDraft, Simp
 from .metrics import summarize_day, summarize_range
 
 
-class FocusWardenWebFrontend:
+class LockedInWebFrontend:
     def __init__(
         self,
         socket_path: str,
@@ -362,7 +362,7 @@ class FocusWardenWebFrontend:
 
         server = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
         try:
-            print(f"Focus Warden web dashboard running at http://127.0.0.1:{self.port}")
+            print(f"Locked-In web dashboard running at http://127.0.0.1:{self.port}")
             server.serve_forever()
             return 0
         except KeyboardInterrupt:
@@ -985,7 +985,7 @@ class FocusWardenWebFrontend:
             import subprocess
             try:
                 subprocess.run(
-                    ["systemctl", "--user", "restart", "focus-warden.service"],
+                    ["systemctl", "--user", "restart", "locked-in.service"],
                     check=True,
                     capture_output=True,
                     text=True,
@@ -1014,7 +1014,7 @@ class FocusWardenWebFrontend:
             text = text.replace(self._HYPR_COMMENTED, self._HYPR_MARKER)
             self._HYPR_AUTOSTART.write_text(text)
         elif enable and self._HYPR_MARKER not in text:
-            text = text.rstrip() + "\n\n# Open Focus Warden dashboard after login\n" + self._HYPR_MARKER + "\n"
+            text = text.rstrip() + "\n\n# Open Locked-In dashboard after login\n" + self._HYPR_MARKER + "\n"
             self._HYPR_AUTOSTART.write_text(text)
         elif not enable and self._HYPR_MARKER in text and self._HYPR_COMMENTED not in text:
             text = text.replace(self._HYPR_MARKER, self._HYPR_COMMENTED)
@@ -1095,7 +1095,7 @@ class FocusWardenWebFrontend:
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>History — Focus Warden</title>
+<title>History — Locked-In</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wg@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
@@ -1157,7 +1157,7 @@ a.cal__cell::after, a.nav-tile::after{{content:'';position:absolute;top:0;left:0
 <body>
 <div class="shell">
 <nav class="nav">
-    <a href="/" class="nav__brand">Focus Warden</a>
+    <a href="/" class="nav__brand">Locked-In</a>
     <a href="/" class="nav__btn">&#8592; Dashboard</a>
 </nav>
 
@@ -1211,7 +1211,7 @@ a.cal__cell::after, a.nav-tile::after{{content:'';position:absolute;top:0;left:0
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Settings — Focus Warden</title>
+<title>Settings — Locked-In</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
@@ -1256,7 +1256,7 @@ h1{{font-family:var(--sans);font-size:22px;font-weight:700;color:var(--txh);marg
 <body>
 <div class="shell">
 <nav class="nav">
-    <a href="/" class="nav__brand" style="text-decoration:none">Focus Warden</a>
+    <a href="/" class="nav__brand" style="text-decoration:none">Locked-In</a>
     <div class="nav__r">
         <a href="/" class="nav__btn">&#8592; Dashboard</a>
     </div>
@@ -1443,7 +1443,7 @@ h1{{font-family:var(--sans);font-size:22px;font-weight:700;color:var(--txh);marg
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>{task_name} — Focus Warden</title>
+<title>{task_name} — Locked-In</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
@@ -1534,7 +1534,7 @@ body{{font-family:var(--sans);background:var(--bg);color:var(--tx);line-height:1
 <body>
 <div class="shell">
 <nav class="nav">
-    <a href="/" class="nav__brand">Focus Warden</a>
+    <a href="/" class="nav__brand">Locked-In</a>
     <a href="{back_link}" class="nav__btn">&#8592; Back</a>
 </nav>
 
@@ -1945,7 +1945,7 @@ document.addEventListener('submit', async (e) => {{
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>Focus Warden</title>
+<title>Locked-In</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Outfit:wg@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
@@ -2135,7 +2135,7 @@ details.raw-import summary{{font-family:var(--mono);font-size:11px;color:var(--a
 <body>
 <div class="shell">
 <nav class="nav">
-    <div class="nav__brand">Focus Warden</div>
+    <div class="nav__brand">Locked-In</div>
     <div class="nav__r">
         <span class="clock" id="clock"></span>
         <span class="dot {html.escape(daemon_dot)}"></span>

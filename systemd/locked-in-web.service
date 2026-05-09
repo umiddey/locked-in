@@ -1,10 +1,10 @@
 [Unit]
-Description=Focus Warden Web Dashboard
+Description=Locked-In Web Dashboard
 
 [Service]
 Type=simple
 # Adjust the path below to your install location
-ExecStart=%h/.local/bin/focus-warden web --port 8765
+ExecStart=%h/.local/bin/locked-in web --port 8765
 Restart=on-failure
 RestartSec=2
 

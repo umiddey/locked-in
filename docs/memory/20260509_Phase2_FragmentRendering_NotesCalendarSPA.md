@@ -37,7 +37,7 @@
 - Notes: `current_notes` read from `detail["runs"][-1]["notes"]` in task detail page
 - Calendar: built with `cal_mod.monthrange(year, month)` for days-in-month, weekday offset for grid alignment
 ## FILES MODIFIED
-- `src/focus_warden/web_frontend.py`: All changes above across 4 phases
+- `src/locked_in/web_frontend.py`: All changes above across 4 phases
 ## NEXT SESSION
 - All phases complete. Full plan is done.
 ## REFERENCES

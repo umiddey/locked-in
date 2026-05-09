@@ -3,7 +3,7 @@
 **Implementation Status: PENDING**
 
 ## Context & Thought Process
-Currently, Focus Warden uses hardcoded interrupt thresholds (e.g., 3 for keyboard, 10 for USB) to distinguish between noise and user activity. This is brittle because different hardware (mechanical keyboards, high-DPI mice, different USB hubs) produces vastly different interrupt rates.
+Currently, Locked-In uses hardcoded interrupt thresholds (e.g., 3 for keyboard, 10 for USB) to distinguish between noise and user activity. This is brittle because different hardware (mechanical keyboards, high-DPI mice, different USB hubs) produces vastly different interrupt rates.
 
 "Auto-Calibration" allows the app to learn the specific "fingerprint" of the user's hardware, ensuring perfect accuracy without manual config editing.
 
@@ -35,7 +35,7 @@ Currently, Focus Warden uses hardcoded interrupt thresholds (e.g., 3 for keyboar
 - Show the results: "New thresholds detected: Keyboard (2), USB (15). [Apply]"
 
 ### 2.2 CLI Integration
-- `focus-warden calibrate` command for headless or terminal-focused users.
+- `locked-in calibrate` command for headless or terminal-focused users.
 
 ---
 

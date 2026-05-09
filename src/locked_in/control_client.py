@@ -34,11 +34,11 @@ def send_command(socket_path: str, command: dict) -> dict:
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: focus-warden <command> [args]")
+        print("Usage: locked-in <command> [args]")
         print("Commands: pause, resume, give-up, status")
         sys.exit(1)
 
-    socket_path = "~/.local/state/focus-warden/control.sock"
+    socket_path = "~/.local/state/locked-in/control.sock"
     import os
     socket_path = os.path.expanduser(socket_path)
 

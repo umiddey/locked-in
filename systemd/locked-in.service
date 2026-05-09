@@ -1,12 +1,12 @@
 [Unit]
-Description=Focus Warden Daemon
+Description=Locked-In Daemon
 After=graphical-session.target
 PartOf=graphical-session.target
 
 [Service]
 Type=simple
 # Adjust the path below to your install location
-ExecStart=%h/.local/bin/focus-warden run-legacy
+ExecStart=%h/.local/bin/locked-in run-legacy
 Restart=on-failure
 RestartSec=2
 

@@ -13,12 +13,12 @@ else:
 
 CONFIG_SEARCH_PATHS = [
     Path("config.toml"),
-    Path("~/.config/focus-warden/config.toml"),
+    Path("~/.config/locked-in/config.toml"),
 ]
 
 ENV_SEARCH_PATHS = [
     Path(".env"),
-    Path("~/.config/focus-warden/.env"),
+    Path("~/.config/locked-in/.env"),
 ]
 
 ENV_FIELD_MAP = {
@@ -83,7 +83,7 @@ class WardenConfig:
 
 @dataclass
 class ControlConfig:
-    socket_path: str = "~/.local/state/focus-warden/control.sock"
+    socket_path: str = "~/.local/state/locked-in/control.sock"
 
 
 @dataclass

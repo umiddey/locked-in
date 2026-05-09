@@ -5,7 +5,7 @@ import sqlite3
 from .simple_store import SimpleTodoStore
 
 
-LEGACY_DB_PATH = Path.home() / ".local" / "share" / "focus-warden" / "warden.db"
+LEGACY_DB_PATH = Path.home() / ".local" / "share" / "locked-in" / "warden.db"
 
 
 def repair_backfill_task_mapping(store: SimpleTodoStore) -> dict:

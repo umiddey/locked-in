@@ -1,7 +1,7 @@
 [Unit]
-Description=Open Focus Warden dashboard in browser on login
-After=focus-warden-web.service graphical-session.target
-Requires=focus-warden-web.service
+Description=Open Locked-In dashboard in browser on login
+After=locked-in-web.service graphical-session.target
+Requires=locked-in-web.service
 Wants=graphical-session.target
 
 [Service]

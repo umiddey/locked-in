@@ -14,8 +14,8 @@
 - The user reported that idle detection was "too strict" and triggering while they were still active (light work/typing).
 - By decoupling the paths, we can be extremely sensitive to "staying awake" (preventing pause) while remaining strict about "waking up" (resuming task), which requires a higher level of confidence in user intent.
 ## FILES MODIFIED
-- `src/focus_warden/idle_detector.py`
-- `src/focus_warden/daemon.py`
+- `src/locked_in/idle_detector.py`
+- `src/locked_in/daemon.py`
 - `config.toml`
 - `tests/test_idle_detector.py` (New)
 ## NEXT SESSION

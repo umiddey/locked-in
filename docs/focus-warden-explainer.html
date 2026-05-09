@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Focus Warden - Technical Build Explainer</title>
+<title>Locked-In - Technical Build Explainer</title>
 <style>
   :root {
     --bg: #0b0f14;
@@ -1055,7 +1055,7 @@
   <section class="hero panel">
     <div class="hero-copy">
       <div class="kicker">Technical build explainer</div>
-      <h1>Focus Warden</h1>
+      <h1>Locked-In</h1>
       <p class="lede">
         This page explains how the repo is assembled, not what it promises to do. The build starts
         at the CLI entry point, loads configuration, fans out into a simple planner runtime and a
@@ -1071,11 +1071,11 @@
         <span class="chip">Unix socket IPC</span>
       </div>
       <div class="terminal" aria-label="Command surface">
-        <div class="line"><span class="prompt">$</span> focus-warden run</div>
+        <div class="line"><span class="prompt">$</span> locked-in run</div>
         <div class="line"><span class="dim">Default build path:</span> enters <span class="path">SimpleTodoApp</span>, the lightweight planner runtime.</div>
-        <div class="line"><span class="prompt">$</span> focus-warden run-legacy</div>
+        <div class="line"><span class="prompt">$</span> locked-in run-legacy</div>
         <div class="line"><span class="dim">Legacy build path:</span> starts the daemon, blocker, notifications, and control socket.</div>
-        <div class="line"><span class="prompt">$</span> focus-warden pause <span class="dim">| resume | status | give-up</span></div>
+        <div class="line"><span class="prompt">$</span> locked-in pause <span class="dim">| resume | status | give-up</span></div>
       </div>
       <div class="story panel">
         <div class="story-head">
@@ -1087,7 +1087,7 @@
         </div>
         <p class="story-body" id="story-body">
           The build starts with `pyproject.toml`, which declares the package, dependencies, and the
-          `focus-warden` console script. Everything else hangs off that root.
+          `locked-in` console script. Everything else hangs off that root.
         </p>
         <div class="story-track" id="story-track">
           <div class="story-step active" data-step="0">
@@ -1140,7 +1140,7 @@
 
         <button class="node main active" data-node="main" style="left:50%; top:51%;" type="button">
           <span class="tag">Entry point</span>
-          <span class="name">focus-warden</span>
+          <span class="name">locked-in</span>
           <span class="hint">CLI router and runtime selector.</span>
         </button>
         <button class="node" data-node="simple_app" style="left:25%; top:24%;" type="button">
@@ -1232,12 +1232,12 @@
             </div>
             <div class="tension-item">
               <strong>Default path vs legacy path</strong>
-              <p>The current service launches <code>focus-warden run</code>, which hits the simple planner path instead of the daemon.</p>
+              <p>The current service launches <code>locked-in run</code>, which hits the simple planner path instead of the daemon.</p>
             </div>
           </div>
           <div class="callout">
             The most important implementation detail: <strong>the service points at
-            <code>focus-warden run</code></strong>, so the shipped default behavior is the planner
+            <code>locked-in run</code></strong>, so the shipped default behavior is the planner
             runtime. The daemon is present, but it is not the installed entry point.
           </div>
         </article>
@@ -1249,8 +1249,8 @@
               <div class="head">1. Package entry</div>
               <h3>pyproject.toml</h3>
               <p>
-                Declares the project metadata, dependencies, and the <code>focus-warden</code> console
-                script that points into <code>focus_warden.main:main</code>.
+                Declares the project metadata, dependencies, and the <code>locked-in</code> console
+                script that points into <code>locked_in.main:main</code>.
               </p>
             </div>
             <div class="compare-item">
@@ -1412,11 +1412,11 @@
             </div>
             <div class="row">
               <strong>File</strong>
-              <code id="inspector-file">src/focus_warden/main.py</code>
+              <code id="inspector-file">src/locked_in/main.py</code>
             </div>
             <div class="row">
               <strong>Signals to watch</strong>
-              <span id="inspector-signals">focus-warden run, focus-warden run-legacy, pause/resume/status/give-up.</span>
+              <span id="inspector-signals">locked-in run, locked-in run-legacy, pause/resume/status/give-up.</span>
             </div>
           </div>
         </aside>
@@ -1553,7 +1553,7 @@
           <h2>Socket protocol</h2>
           <p class="sub">
             External controls go through a Unix domain socket at
-            <code>~/.local/state/focus-warden/control.sock</code>. The server binds once, accepts a
+            <code>~/.local/state/locked-in/control.sock</code>. The server binds once, accepts a
             single JSON object per connection, and returns a JSON response.
           </p>
           <div class="ipc-list">
@@ -1689,12 +1689,12 @@ response:
             </div>
             <div class="stack-item">
               <strong>Service wiring</strong>
-              `systemd/focus-warden.service` launches `focus-warden run`, so the default service follows the simple path.
+              `systemd/locked-in.service` launches `locked-in run`, so the default service follows the simple path.
             </div>
           </div>
           <div class="codebox">
             <span class="line"><span class="comment"># service and config seam</span></span>
-            <span class="line"><span class="accent">ExecStart=/home/ukd/projects/focus-warden/.venv/bin/focus-warden run</span></span>
+            <span class="line"><span class="accent">ExecStart=/home/ukd/projects/locked-in/.venv/bin/locked-in run</span></span>
             <span class="line"><span class="comment"># config.toml chooses which path the runtime takes after startup.</span></span>
             <span class="line"><span class="comment"># config.example.toml documents the expected Notion and schedule fields.</span></span>
           </div>
@@ -1750,22 +1750,22 @@ response:
   const stateCards = [...document.querySelectorAll(".state")];
   const metrics = [...document.querySelectorAll("[data-count]")];
 
-  const viewStorageKey = "focus-warden-view";
+  const viewStorageKey = "locked-in-view";
   const nodeData = {
     main: {
       title: "main.py",
       badge: "CLI router",
-      file: "src/focus_warden/main.py",
+      file: "src/locked_in/main.py",
       summary:
         "This is the top-level switchboard. It decides whether the runtime uses the simple path, the legacy daemon, or a local control command.",
-      signals: "focus-warden run, run-legacy, pause, resume, status, give-up, fetch-tasks, show-schedule.",
+      signals: "locked-in run, run-legacy, pause, resume, status, give-up, fetch-tasks, show-schedule.",
       why:
         "The dependency tree starts here. The CLI parser and config loader determine every later branch.",
     },
     simple_app: {
       title: "simple_app.py",
       badge: "Default runtime",
-      file: "src/focus_warden/simple_app.py",
+      file: "src/locked_in/simple_app.py",
       summary:
         "Chooses between the planner and dashboard windows based on whether a local plan exists for the target day.",
       signals: "SimpleTodoApp, morning and night launch windows, plan-to-dashboard handoff.",
@@ -1775,7 +1775,7 @@ response:
     simple_store: {
       title: "simple_store.py",
       badge: "Local planning DB",
-      file: "src/focus_warden/simple_store.py",
+      file: "src/locked_in/simple_store.py",
       summary:
         "Owns the planner SQLite schema, session rows, task runs, and the one-time JSON migration path.",
       signals: "plans, plan_tasks, daily_sessions, task_runs.",
@@ -1785,7 +1785,7 @@ response:
     simple_ui: {
       title: "simple_ui.py",
       badge: "Qt windows",
-      file: "src/focus_warden/simple_ui.py",
+      file: "src/locked_in/simple_ui.py",
       summary:
         "Renders the planner, schedule dashboard, and task timer in PyQt6 widgets.",
       signals: "PlannerWindow, ScheduleDashboardWindow, TaskTimerWindow.",
@@ -1795,7 +1795,7 @@ response:
     notion_client: {
       title: "notion_client.py",
       badge: "Task import",
-      file: "src/focus_warden/notion_client.py",
+      file: "src/locked_in/notion_client.py",
       summary:
         "Resolves database versus data source access, applies property filters, paginates queries, and normalizes tasks.",
       signals: "title, date, estimate, status/select/multi-select filters.",
@@ -1805,7 +1805,7 @@ response:
     scheduler: {
       title: "scheduler.py",
       badge: "Deterministic plan",
-      file: "src/focus_warden/scheduler.py",
+      file: "src/locked_in/scheduler.py",
       summary:
         "Creates the day schedule from tasks, session start, grace period, stretch cadence, gym offset, and shutdown deadline.",
       signals: "grace window, stretch insertion, gym break, shutdown warning, hard shutdown.",
@@ -1815,7 +1815,7 @@ response:
     daemon: {
       title: "daemon.py",
       badge: "Legacy engine",
-      file: "src/focus_warden/daemon.py",
+      file: "src/locked_in/daemon.py",
       summary:
         "Runs the manual Qt event loop, fetches tasks, creates the session, shows the blocker, logs to SQLite, and handles control commands.",
       signals: "session start, tick loop, blocker activation, interruption logging.",
@@ -1825,7 +1825,7 @@ response:
     ui: {
       title: "ui.py",
       badge: "Fullscreen blocker",
-      file: "src/focus_warden/ui.py",
+      file: "src/locked_in/ui.py",
       summary:
         "Displays a fullscreen blocker that gates task starts by typed title and break starts by button press.",
       signals: "Escape blocking, confirm button gating, fullscreen close resistance.",
@@ -1835,7 +1835,7 @@ response:
     control: {
       title: "control_server.py",
       badge: "IPC socket",
-      file: "src/focus_warden/control_server.py",
+      file: "src/locked_in/control_server.py",
       summary:
         "Binds a Unix socket, accepts JSON commands, and hands them to the daemon command handler.",
       signals: "pause, resume, give_up, status.",
@@ -1845,7 +1845,7 @@ response:
     db: {
       title: "db.py",
       badge: "Daemon persistence",
-      file: "src/focus_warden/db.py",
+      file: "src/locked_in/db.py",
       summary:
         "Defines the daemon SQLite schema for sessions, tasks, interruptions, and control events.",
       signals: "sessions, tasks, interruptions, control_events.",

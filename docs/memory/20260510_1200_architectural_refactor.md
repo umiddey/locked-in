@@ -6,7 +6,7 @@
 - Decouple Daemon into independent background services. ❌
 - Implement thread-safe event queue for state changes. ❌
 ## HOW
-- Create `src/focus_warden/templates/` and migrate layouts/components.
+- Create `src/locked_in/templates/` and migrate layouts/components.
 - Extract `IdleDetector` and `ActivityDetector` into standalone service threads.
 - Refactor `Daemon._tick` to be an event consumer rather than a poller.
 ## WHY

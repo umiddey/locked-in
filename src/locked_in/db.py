@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .models import Interruption, Session, SessionStatus, Task, TaskStatus
 
-DEFAULT_DB_PATH = "~/.local/share/focus-warden/warden.db"
+DEFAULT_DB_PATH = "~/.local/share/locked-in/warden.db"
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (

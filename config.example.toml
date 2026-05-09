@@ -15,7 +15,7 @@ give_up_cooldown_seconds = 30
 give_up_requires_phrase = "I AM GIVING UP TODAY"
 
 [control]
-socket_path = "~/.local/state/focus-warden/control.sock"
+socket_path = "~/.local/state/locked-in/control.sock"
 
 [ui]
 theme = "black"

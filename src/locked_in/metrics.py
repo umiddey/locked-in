@@ -1,7 +1,7 @@
 from datetime import date, datetime, timedelta
 from collections import Counter
 
-from focus_warden.simple_store import (
+from locked_in.simple_store import (
     SimpleTodoStore,
     TimeBlock,
     PlanTask,

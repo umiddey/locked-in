@@ -1,10 +1,10 @@
-# Focus Warden Metrics-Grade Time Tracking Plan
+# Locked-In Metrics-Grade Time Tracking Plan
 
 Created: 2026-05-06 11:03 Europe/Berlin
 
 ## Goal
 
-Turn Focus Warden from a basic planner/timer into a reliable local time-tracking and productivity metrics system.
+Turn Locked-In from a basic planner/timer into a reliable local time-tracking and productivity metrics system.
 
 The finished system must answer questions like:
 
@@ -30,13 +30,13 @@ There are currently two independent tracking stores.
 File:
 
 ```text
-src/focus_warden/simple_store.py
+src/locked_in/simple_store.py
 ```
 
 Database:
 
 ```text
-~/.local/share/focus-warden/simple_todos.db
+~/.local/share/locked-in/simple_todos.db
 ```
 
 Tables:
@@ -68,13 +68,13 @@ Problems:
 File:
 
 ```text
-src/focus_warden/db.py
+src/locked_in/db.py
 ```
 
 Database:
 
 ```text
-~/.local/share/focus-warden/warden.db
+~/.local/share/locked-in/warden.db
 ```
 
 Tables:
@@ -371,7 +371,7 @@ Eventually `task_runs` can become a view over `time_blocks`, but do not do that 
 File:
 
 ```text
-src/focus_warden/simple_store.py
+src/locked_in/simple_store.py
 ```
 
 Add dataclasses:
@@ -437,7 +437,7 @@ Rules:
 File:
 
 ```text
-src/focus_warden/daemon.py
+src/locked_in/daemon.py
 ```
 
 When daemon creates a session:
@@ -572,7 +572,7 @@ At daemon startup:
 File:
 
 ```text
-src/focus_warden/web_frontend.py
+src/locked_in/web_frontend.py
 ```
 
 Add API endpoints:
@@ -648,7 +648,7 @@ Add a weekly summary:
 Add a new file:
 
 ```text
-src/focus_warden/metrics.py
+src/locked_in/metrics.py
 ```
 
 Functions:
@@ -905,7 +905,7 @@ Use this exact order to minimize breakage:
 Add CLI command:
 
 ```text
-focus-warden backfill-metrics
+locked-in backfill-metrics
 ```
 
 Behavior:
@@ -1077,24 +1077,24 @@ Rule:
 Primary:
 
 ```text
-src/focus_warden/simple_store.py
-src/focus_warden/daemon.py
-src/focus_warden/web_frontend.py
-src/focus_warden/main.py
+src/locked_in/simple_store.py
+src/locked_in/daemon.py
+src/locked_in/web_frontend.py
+src/locked_in/main.py
 ```
 
 New:
 
 ```text
-src/focus_warden/metrics.py
-src/focus_warden/backfill_metrics.py
+src/locked_in/metrics.py
+src/locked_in/backfill_metrics.py
 ```
 
 Optional:
 
 ```text
-src/focus_warden/models.py
-docs/focus-warden-explainer.html
+src/locked_in/models.py
+docs/locked-in-explainer.html
 ```
 
 ## Acceptance Criteria
@@ -1131,31 +1131,31 @@ Schema should make these possible later, but first pass should focus on trustwor
 Compile:
 
 ```bash
-rtk .venv/bin/python -m compileall -q src/focus_warden
+rtk .venv/bin/python -m compileall -q src/locked_in
 ```
 
 Inspect DB:
 
 ```bash
-rtk sqlite3 ~/.local/share/focus-warden/simple_todos.db '.schema'
+rtk sqlite3 ~/.local/share/locked-in/simple_todos.db '.schema'
 ```
 
 Check status:
 
 ```bash
-rtk .venv/bin/focus-warden status
+rtk .venv/bin/locked-in status
 ```
 
 Restart daemon:
 
 ```bash
-rtk systemctl --user restart focus-warden.service
+rtk systemctl --user restart locked-in.service
 ```
 
 Restart web:
 
 ```bash
-rtk systemctl --user restart focus-warden-web.service
+rtk systemctl --user restart locked-in-web.service
 ```
 
 Open metrics JSON:

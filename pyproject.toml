@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "focus-warden"
+name = "locked-in"
 version = "0.1.0"
-description = "Linux desktop focus enforcer — scheduled tasks, enforced breaks, and hard shutdowns"
+description = "Linux desktop focus enforcer — scheduled tasks, enforced breaks, and hard shutdowns (Locked-In)"
 requires-python = ">=3.11"
 license = "MIT"
 dependencies = [
@@ -17,7 +17,7 @@ dependencies = [
 notion = ["notion-client>=2.0.0"]
 
 [project.scripts]
-focus-warden = "focus_warden.main:main"
+locked-in = "locked_in.main:main"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/focus_warden"]
+packages = ["src/locked_in"]

@@ -18,8 +18,8 @@
 User wanted drill-down into individual tasks to see exactly when they worked vs took breaks. Data was already being tracked in `time_blocks` table — only the UI/route layer was missing. No schema changes needed.
 
 ## FILES MODIFIED
-- `src/focus_warden/simple_store.py`: +`get_task_detail()` (~100 LOC)
-- `src/focus_warden/web_frontend.py`: +routes, +`_render_task_detail_page()`, +`_render_404()`, clickable names (~200 LOC)
+- `src/locked_in/simple_store.py`: +`get_task_detail()` (~100 LOC)
+- `src/locked_in/web_frontend.py`: +routes, +`_render_task_detail_page()`, +`_render_404()`, clickable names (~200 LOC)
 
 ## NEXT SESSION
 - Could add a visual timeline bar chart (horizontal stacked bars for work/pause proportions)

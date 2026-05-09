@@ -15,8 +15,8 @@
 - Finish already had backend support, just needed UI textarea
 - Extend had no notes support at all — added to event metadata since extends don't create task_runs
 ## FILES MODIFIED
-- `src/focus_warden/web_frontend.py`: textarea in finish+extend forms, CSS for `.act-notes`/`.act-form`, extend handler reads notes
-- `src/focus_warden/simple_store.py`: `extend_task_runtime` accepts `notes` kwarg, stores in event metadata
+- `src/locked_in/web_frontend.py`: textarea in finish+extend forms, CSS for `.act-notes`/`.act-form`, extend handler reads notes
+- `src/locked_in/simple_store.py`: `extend_task_runtime` accepts `notes` kwarg, stores in event metadata
 ## NEXT SESSION
 - Pre-existing test failure in `test_historical_render_shows_date_picker_and_return_button` (KeyError: 'plan_exists') — unrelated
 ## REFERENCES

@@ -1,4 +1,4 @@
-# Plan: Three Focus Warden Fixes
+# Plan: Three Locked-In Fixes
 **Date**: 2026-05-09
 **Status**: IN PROGRESS
 
@@ -26,8 +26,8 @@ User reported 3 bugs:
 **Files**: `daemon.py`
 
 Root cause analysis:
-- **"Session started" on save**: In `_bootstrap_session()` line 208, `notify("Focus Warden", "Session started")` fires unconditionally when the daemon boots and finds a plan. The web frontend's "Save + Start" sends `start_task` command which goes through `_handle_start_task` — but the daemon also calls `_bootstrap_session()` on startup which fires that notification. The fix: don't send "Session started" on bootstrap. Only send task-specific notifications.
-- **Next task notification too early/wrong**: In `_activate_item()` line 458, `notify("Focus Warden", f"Next: {item.title}")` fires when ANY schedule item activates. But the schedule is built from daemon's scheduler (old system), while the web uses task_runtime (new system). The daemon's schedule iteration in `_tick()` at line 267-279 walks `self.schedule` items by `scheduled_start` time — but those times don't shift with pauses/extensions. The 5-minute-before-next notification doesn't exist — it's just the `_activate_item` notification which fires whenever `now >= item.scheduled_start`. We need a proper "next task in 5 min" notification that fires based on the CURRENT task's ETA, not the schedule.
+- **"Session started" on save**: In `_bootstrap_session()` line 208, `notify("Locked-In", "Session started")` fires unconditionally when the daemon boots and finds a plan. The web frontend's "Save + Start" sends `start_task` command which goes through `_handle_start_task` — but the daemon also calls `_bootstrap_session()` on startup which fires that notification. The fix: don't send "Session started" on bootstrap. Only send task-specific notifications.
+- **Next task notification too early/wrong**: In `_activate_item()` line 458, `notify("Locked-In", f"Next: {item.title}")` fires when ANY schedule item activates. But the schedule is built from daemon's scheduler (old system), while the web uses task_runtime (new system). The daemon's schedule iteration in `_tick()` at line 267-279 walks `self.schedule` items by `scheduled_start` time — but those times don't shift with pauses/extensions. The 5-minute-before-next notification doesn't exist — it's just the `_activate_item` notification which fires whenever `now >= item.scheduled_start`. We need a proper "next task in 5 min" notification that fires based on the CURRENT task's ETA, not the schedule.
 
 Fix approach:
 - Remove the generic "Session started" from bootstrap

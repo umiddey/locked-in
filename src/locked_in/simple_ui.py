@@ -38,7 +38,7 @@ class TodoPlannerWindow(QWidget):
         self._setup_ui(existing_tasks or [])
 
     def _setup_ui(self, existing_tasks: list[TaskDraft]) -> None:
-        self.setWindowTitle("Focus Warden Planner")
+        self.setWindowTitle("Locked-In Planner")
         self.setMinimumSize(760, 560)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.setStyleSheet(
@@ -154,7 +154,7 @@ class TaskDeadlinePopup(QWidget):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        self.setWindowTitle("Focus Warden")
+        self.setWindowTitle("Locked-In")
         self.setFixedSize(380, 230)
         self.setWindowFlags(
             Qt.WindowType.Tool
@@ -301,7 +301,7 @@ class TaskTimerWindow(QWidget):
                 self.entry.task.id,
                 self.entry.scheduled_start,
             )
-        notify("Focus Warden", f"Task started: {self.entry.task.task_name}")
+        notify("Locked-In", f"Task started: {self.entry.task.task_name}")
         if self.remaining_seconds <= TASK_POPUP_SECONDS:
             self._show_popup()
 
@@ -329,7 +329,7 @@ class TaskTimerWindow(QWidget):
             if threshold in self._notified_thresholds:
                 continue
             if previous > threshold >= current:
-                notify("Focus Warden", title, body, urgency[0] if urgency else "normal")
+                notify("Locked-In", title, body, urgency[0] if urgency else "normal")
                 self._notified_thresholds.add(threshold)
 
     def _show_popup(self) -> None:
@@ -341,7 +341,7 @@ class TaskTimerWindow(QWidget):
         self._popup.activateWindow()
         if self.remaining_seconds <= TASK_POPUP_SECONDS:
             notify(
-                "Focus Warden",
+                "Locked-In",
                 f"{max(self.remaining_seconds, 0)} seconds left",
                 "critical",
             )
@@ -360,7 +360,7 @@ class TaskTimerWindow(QWidget):
         self._close_popup()
         if self.on_finished and self.run_id is not None:
             self.on_finished(self.run_id, "")
-        notify("Focus Warden", "Task marked finished.")
+        notify("Locked-In", "Task marked finished.")
 
     def extend_task(self) -> None:
         if self._task_complete:
@@ -380,7 +380,7 @@ class TaskTimerWindow(QWidget):
         self.remaining_seconds += extra_seconds
         self._notified_thresholds.clear()
         self._close_popup()
-        notify("Focus Warden", message)
+        notify("Locked-In", message)
 
 
 class ScheduleDashboardWindow(QWidget):
@@ -398,7 +398,7 @@ class ScheduleDashboardWindow(QWidget):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
-        self.setWindowTitle("Focus Warden Schedule")
+        self.setWindowTitle("Locked-In Schedule")
         self.setMinimumSize(760, 560)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
         self.setStyleSheet(

@@ -8,8 +8,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 
-DEFAULT_STORE_PATH = Path.home() / ".local" / "share" / "focus-warden" / "simple_todos.db"
-LEGACY_JSON_PATH = Path.home() / ".local" / "share" / "focus-warden" / "simple_todos.json"
+DEFAULT_STORE_PATH = Path.home() / ".local" / "share" / "locked-in" / "simple_todos.db"
+LEGACY_JSON_PATH = Path.home() / ".local" / "share" / "locked-in" / "simple_todos.json"
 DEFAULT_TASK_DURATION_MINUTES = 30
 SESSION_RESET_HOUR = 6
 

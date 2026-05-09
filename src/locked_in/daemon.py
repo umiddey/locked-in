@@ -262,7 +262,7 @@ class Daemon:
             log.error("Failed to start session: %s", e)
             self._bootstrap_error = message
             self._next_bootstrap_retry_at = datetime.now() + timedelta(minutes=5)
-            notify("Focus Warden Error", message, "critical")
+            notify("Locked-In Error", message, "critical")
             return False
 
         self._bootstrap_error = None
@@ -319,7 +319,7 @@ class Daemon:
                     self._shutdown_warning_until.isoformat(timespec="seconds"),
                 )
                 notify(
-                    "Focus Warden",
+                    "Locked-In",
                     f"Hard shutdown in {self.config.schedule.shutdown_warning_minutes} minutes.",
                     "critical",
                 )
@@ -330,7 +330,7 @@ class Daemon:
             for item in self.schedule:
                 if now >= item.scheduled_start:
                     if item.kind == ScheduleKind.SHUTDOWN_WARNING:
-                        notify("Focus Warden", f"WARNING: Shutdown in {self.config.schedule.shutdown_warning_minutes} minutes!", "critical")
+                        notify("Locked-In", f"WARNING: Shutdown in {self.config.schedule.shutdown_warning_minutes} minutes!", "critical")
                         self.schedule.remove(item)
                         break
                     if item.kind == ScheduleKind.SHUTDOWN:
@@ -387,7 +387,7 @@ class Daemon:
                         self.sm.transition(State.PAUSED)
                         self._stretch_lockout.pause()
                         log.info("Auto-paused for microphone use: %s", ", ".join(snapshot.apps))
-                        notify("Focus Warden", f"Paused for microphone use: {', '.join(snapshot.apps)}")
+                        notify("Locked-In", f"Paused for microphone use: {', '.join(snapshot.apps)}")
                     except ValueError:
                         pass
                 else:
@@ -418,7 +418,7 @@ class Daemon:
                         self._stretch_lockout.resume()
                         self._recover_active_task(today)
                         log.info("Auto-resumed after microphone silence")
-                        notify("Focus Warden", "Resumed")
+                        notify("Locked-In", "Resumed")
                     except ValueError:
                         pass
                 else:
@@ -457,7 +457,7 @@ class Daemon:
                                 self._stretch_lockout.resume()
                                 log.info("Auto-resumed from idle (%d events in 30s)", len(self._idle_resume_events))
                                 self._idle_resume_events.clear()
-                                notify("Focus Warden", "Resumed — welcome back!")
+                                notify("Locked-In", "Resumed — welcome back!")
                             except ValueError:
                                 pass
                         else:
@@ -486,7 +486,7 @@ class Daemon:
                     self.sm.transition(State.PAUSED)
                     self._stretch_lockout.pause()
                     log.info("Auto-paused for idle (%.0fs)", idle_secs)
-                    notify("Focus Warden", f"Paused — idle for {int(idle_secs)}s")
+                    notify("Locked-In", f"Paused — idle for {int(idle_secs)}s")
                 except ValueError:
                     pass
 
@@ -516,7 +516,7 @@ class Daemon:
                         break
                 if next_task:
                     notify(
-                        "Focus Warden",
+                        "Locked-In",
                         f"Next up in ~{max(int(minutes_left), 0)} min: {next_task.task_name}",
                     )
             self._next_task_notified_for = rt.id
@@ -548,12 +548,12 @@ class Daemon:
             try:
                 if decision == DECISION_FINISH:
                     self.store.finish_task_runtime(today)
-                    notify("Focus Warden", f"Finished: {task_name}")
+                    notify("Locked-In", f"Finished: {task_name}")
                 elif decision == DECISION_EXTEND:
                     self.store.extend_task_runtime(today, extend_minutes * 60)
                     self._eta_warning_shown_for = None
                     self._next_task_notified_for = None
-                    notify("Focus Warden", f"Extended +{extend_minutes}m: {task_name}")
+                    notify("Locked-In", f"Extended +{extend_minutes}m: {task_name}")
             except ValueError as e:
                 log.warning("ETA warning action failed: %s", e)
 
@@ -695,7 +695,7 @@ class Daemon:
             self._window.close()
             self._window = None
 
-        notify("Focus Warden", message)
+        notify("Locked-In", message)
         return {"status": "paused"}
 
     def _resume_session(self):
@@ -749,7 +749,7 @@ class Daemon:
             if self._item_finish_due_at:
                 self._item_finish_due_at += shift
 
-        notify("Focus Warden", "Resumed")
+        notify("Locked-In", "Resumed")
         return {"status": "resumed", "previous_state": prev.value if prev else None, "pause_seconds": pause_seconds}
 
     def _on_item_finished(self):
@@ -819,12 +819,12 @@ class Daemon:
     def _on_give_up(self):
         now = datetime.now()
         if self._give_up_last and (now - self._give_up_last).total_seconds() < self.config.warden.give_up_cooldown_seconds:
-            notify("Focus Warden", f"Wait {self.config.warden.give_up_cooldown_seconds}s between attempts", "critical")
+            notify("Locked-In", f"Wait {self.config.warden.give_up_cooldown_seconds}s between attempts", "critical")
             return
 
         self._give_up_attempts += 1
         self._give_up_last = now
-        notify("Focus Warden", f"Give up attempt {self._give_up_attempts}. Keep trying to give up.", "critical")
+        notify("Locked-In", f"Give up attempt {self._give_up_attempts}. Keep trying to give up.", "critical")
 
         if self._give_up_attempts >= 3:
             self._do_give_up()
@@ -851,7 +851,7 @@ class Daemon:
             self._window.allow_close()
             self._window.close()
             self._window = None
-        notify("Focus Warden", "Session abandoned. See you tomorrow.", "critical")
+        notify("Locked-In", "Session abandoned. See you tomorrow.", "critical")
         self._running = False
 
     def _finish_session(self):
@@ -872,7 +872,7 @@ class Daemon:
             self.session.status = SessionStatus.FINISHED
             self.session.ended_at = now
             self.db.update_session(self.session)
-        notify("Focus Warden", "All tasks complete!")
+        notify("Locked-In", "All tasks complete!")
         self._running = False
 
     def _shutdown(self):
@@ -893,7 +893,7 @@ class Daemon:
             self.session.status = SessionStatus.FINISHED
             self.session.ended_at = now
             self.db.update_session(self.session)
-        notify("Focus Warden", "Hard shutdown — powering off", "critical")
+        notify("Locked-In", "Hard shutdown — powering off", "critical")
         self._running = False
         subprocess.run(["systemctl", "poweroff"], check=False)
 

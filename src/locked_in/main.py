@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 def main():
-    parser = argparse.ArgumentParser(prog="focus-warden")
+    parser = argparse.ArgumentParser(prog="locked-in")
     parser.add_argument("command", nargs="?", default="run", help="run | open | test-now | run-legacy | web | pause | resume | give-up | status | fetch-tasks | show-schedule | backfill-metrics | repair-backfill | auto-open-on | auto-open-off")
     parser.add_argument("--config", "-c", help="Path to config.toml")
     parser.add_argument("--verbose", "-v", action="store_true")
@@ -67,7 +67,7 @@ def main():
             config = load_config(args.config)
             socket_path = config.control.socket_path
         except FileNotFoundError:
-            socket_path = os.path.expanduser("~/.local/state/focus-warden/control.sock")
+            socket_path = os.path.expanduser("~/.local/state/locked-in/control.sock")
         result = send_command(socket_path, {"command": args.command.replace("-", "_")})
         print(json.dumps(result, indent=2))
         sys.exit(0 if "error" not in result else 1)
@@ -166,7 +166,7 @@ def main():
                 AUTOSTART.write_text(text)
                 print("Auto-open browser on login: ENABLED")
             else:
-                text = text.rstrip() + "\n\n# Open Focus Warden dashboard after login\n" + MARKER + "\n"
+                text = text.rstrip() + "\n\n# Open Locked-In dashboard after login\n" + MARKER + "\n"
                 AUTOSTART.write_text(text)
                 print("Auto-open browser on login: ENABLED")
         else:
@@ -191,10 +191,10 @@ def main():
 
     if args.command == "web":
         from .config import find_config_path
-        from .web_frontend import FocusWardenWebFrontend
+        from .web_frontend import LockedInWebFrontend
         port = args.port or config.web.port
         config_path = find_config_path(args.config)
-        frontend = FocusWardenWebFrontend(config.control.socket_path, port=port, config_path=config_path)
+        frontend = LockedInWebFrontend(config.control.socket_path, port=port, config_path=config_path)
         sys.exit(frontend.run())
 
     print(f"Unknown command: {args.command}")

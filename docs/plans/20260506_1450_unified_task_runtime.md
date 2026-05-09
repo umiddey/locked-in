@@ -4,7 +4,7 @@ Created: 2026-05-06 14:50 Europe/Berlin
 
 ## Problem
 
-Focus Warden currently has multiple competing ideas of "current state":
+Locked-In currently has multiple competing ideas of "current state":
 
 - The daemon builds an automatic schedule from `daily_sessions.session_started_at`.
 - The web frontend starts manual `task_runs`.
@@ -84,12 +84,12 @@ The frontend should not create one task runtime while the daemon creates another
 ### Relevant Files
 
 ```text
-src/focus_warden/simple_store.py
-src/focus_warden/web_frontend.py
-src/focus_warden/daemon.py
-src/focus_warden/state_machine.py
-src/focus_warden/db.py
-src/focus_warden/metrics.py
+src/locked_in/simple_store.py
+src/locked_in/web_frontend.py
+src/locked_in/daemon.py
+src/locked_in/state_machine.py
+src/locked_in/db.py
+src/locked_in/metrics.py
 ```
 
 ### Current Data Stores
@@ -97,13 +97,13 @@ src/focus_warden/metrics.py
 Canonical-ish store:
 
 ```text
-~/.local/share/focus-warden/simple_todos.db
+~/.local/share/locked-in/simple_todos.db
 ```
 
 Legacy daemon store:
 
 ```text
-~/.local/share/focus-warden/warden.db
+~/.local/share/locked-in/warden.db
 ```
 
 ### Current Tables That Matter
@@ -632,7 +632,7 @@ Do not rely on backfilled rows for current active runtime.
 Files:
 
 ```text
-src/focus_warden/simple_store.py
+src/locked_in/simple_store.py
 ```
 
 Tasks:
@@ -652,7 +652,7 @@ Verification:
 Files:
 
 ```text
-src/focus_warden/simple_store.py
+src/locked_in/simple_store.py
 ```
 
 Tasks:
@@ -680,9 +680,9 @@ Tests:
 Files:
 
 ```text
-src/focus_warden/daemon.py
-src/focus_warden/control_server.py
-src/focus_warden/control_client.py
+src/locked_in/daemon.py
+src/locked_in/control_server.py
+src/locked_in/control_client.py
 ```
 
 Tasks:
@@ -695,7 +695,7 @@ Tasks:
 
 Tests:
 
-- `focus-warden status` shows no active task after session start.
+- `locked-in status` shows no active task after session start.
 - Web/CLI `start_task` makes daemon status `task_active`.
 - Web/CLI `pause_task` makes daemon status `paused`.
 - Web/CLI `resume_task` makes daemon status `task_active`.
@@ -706,7 +706,7 @@ Tests:
 Files:
 
 ```text
-src/focus_warden/web_frontend.py
+src/locked_in/web_frontend.py
 ```
 
 Tasks:
@@ -732,9 +732,9 @@ Tests:
 Files:
 
 ```text
-src/focus_warden/simple_store.py
-src/focus_warden/web_frontend.py
-src/focus_warden/main.py
+src/locked_in/simple_store.py
+src/locked_in/web_frontend.py
+src/locked_in/main.py
 ```
 
 Tasks:
@@ -760,9 +760,9 @@ Acceptance:
 Files:
 
 ```text
-src/focus_warden/daemon.py
-src/focus_warden/db.py
-src/focus_warden/backfill_metrics.py
+src/locked_in/daemon.py
+src/locked_in/db.py
+src/locked_in/backfill_metrics.py
 ```
 
 Tasks:
