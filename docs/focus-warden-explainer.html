@@ -1,0 +1,2017 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Focus Warden - Technical Build Explainer</title>
+<style>
+  :root {
+    --bg: #0b0f14;
+    --bg-soft: #101720;
+    --panel: rgba(16, 22, 31, 0.82);
+    --panel-2: rgba(20, 28, 38, 0.9);
+    --line: rgba(233, 210, 176, 0.12);
+    --ink: #f4eadb;
+    --muted: #b9ad9a;
+    --accent: #f2b24f;
+    --accent-2: #7ed7c8;
+    --accent-3: #ef836f;
+    --shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+    --radius: 26px;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    background:
+      radial-gradient(circle at 20% 20%, rgba(242, 178, 79, 0.16), transparent 28%),
+      radial-gradient(circle at 80% 10%, rgba(126, 215, 200, 0.12), transparent 24%),
+      radial-gradient(circle at 70% 80%, rgba(239, 131, 111, 0.12), transparent 26%),
+      linear-gradient(180deg, #0b0f14 0%, #0d131b 45%, #090c11 100%);
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.22;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+    background-size: 30px 30px;
+    mask-image: radial-gradient(circle at center, black 42%, transparent 100%);
+  }
+
+  a { color: inherit; }
+  button, input, textarea, select { font: inherit; }
+
+  .shell {
+    width: min(1440px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 22px 0 48px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
+    gap: 18px;
+    margin-top: 10px;
+  }
+
+  .panel {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius);
+    background: linear-gradient(180deg, rgba(20, 28, 38, 0.9), rgba(12, 18, 26, 0.88));
+    border: 1px solid rgba(233, 210, 176, 0.12);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(14px);
+  }
+
+  .panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+      linear-gradient(135deg, rgba(242, 178, 79, 0.18), transparent 22%),
+      linear-gradient(315deg, rgba(126, 215, 200, 0.08), transparent 24%);
+    opacity: 0.75;
+  }
+
+  .hero-copy, .hero-visual, .card, .tabs, .footer {
+    position: relative;
+    z-index: 1;
+  }
+
+  .hero-copy {
+    padding: 28px;
+  }
+
+  .kicker {
+    display: inline-flex;
+    gap: 10px;
+    align-items: center;
+    text-transform: uppercase;
+    letter-spacing: 0.22em;
+    font-size: 0.72rem;
+    color: var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .kicker::before {
+    content: "";
+    width: 34px;
+    height: 1px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+
+  h1, h2, h3, h4, p { margin: 0; }
+
+  h1 {
+    font-size: clamp(3rem, 6vw, 5.8rem);
+    line-height: 0.92;
+    letter-spacing: -0.04em;
+    max-width: 12ch;
+  }
+
+  .lede {
+    margin-top: 18px;
+    max-width: 66ch;
+    font-size: 1.08rem;
+    line-height: 1.72;
+    color: #e9ddcf;
+  }
+
+  .chips, .tabs, .chip-row, .command-row, .metric-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .chips { margin-top: 18px; }
+
+  .chip, .tab, .command, .metric, .pill, .node-tag {
+    border-radius: 999px;
+    border: 1px solid rgba(233, 210, 176, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--ink);
+  }
+
+  .chip {
+    padding: 10px 13px;
+    font-size: 0.88rem;
+    color: #f7e4bd;
+  }
+
+  .terminal {
+    margin-top: 22px;
+    border-radius: 22px;
+    background: linear-gradient(180deg, rgba(7, 10, 14, 0.8), rgba(15, 21, 29, 0.95));
+    border: 1px solid rgba(233, 210, 176, 0.12);
+    padding: 16px 18px;
+    font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.92rem;
+    line-height: 1.7;
+  }
+
+  .terminal .line { color: #d3e9e2; }
+  .terminal .line + .line { margin-top: 4px; }
+  .prompt { color: var(--accent); }
+  .path { color: #9bd9ff; }
+  .dim { color: var(--muted); }
+
+  .story {
+    margin-top: 18px;
+    padding: 18px;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 210, 176, 0.1);
+  }
+
+  .story-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .story-title {
+    font-size: 1.28rem;
+    letter-spacing: -0.02em;
+  }
+
+  .story-index {
+    font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+    color: var(--muted);
+    font-size: 0.82rem;
+  }
+
+  .story-body {
+    margin-top: 8px;
+    color: #eadcc9;
+    line-height: 1.6;
+  }
+
+  .story-track {
+    position: relative;
+    margin-top: 14px;
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .story-track::before {
+    content: "";
+    position: absolute;
+    left: 6px;
+    right: 6px;
+    top: 50%;
+    height: 2px;
+    transform: translateY(-50%);
+    background: linear-gradient(90deg, rgba(242,178,79,0.12), rgba(242,178,79,0.55), rgba(126,215,200,0.55), rgba(239,131,111,0.55), rgba(242,178,79,0.15));
+    opacity: 0.6;
+  }
+
+  .story-step {
+    position: relative;
+    z-index: 1;
+    min-height: 92px;
+    padding: 12px 10px 10px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 210, 176, 0.08);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 8px;
+    transition: transform 0.28s ease, border-color 0.28s ease, background 0.28s ease;
+  }
+
+  .story-step.active {
+    transform: translateY(-4px);
+    border-color: rgba(242, 178, 79, 0.55);
+    background: rgba(242, 178, 79, 0.12);
+    box-shadow: 0 18px 30px rgba(0, 0, 0, 0.26);
+  }
+
+  .story-step .label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--muted);
+  }
+
+  .story-step .text {
+    font-size: 0.88rem;
+    line-height: 1.35;
+    color: #f2e7d8;
+  }
+
+  .hero-visual {
+    min-height: 560px;
+    padding: 24px;
+  }
+
+  .orbit {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 512px;
+    border-radius: 24px;
+    background:
+      radial-gradient(circle at center, rgba(242, 178, 79, 0.08), transparent 36%),
+      radial-gradient(circle at 50% 50%, rgba(255,255,255,0.02), transparent 58%);
+    border: 1px solid rgba(233, 210, 176, 0.08);
+    overflow: hidden;
+  }
+
+  .orbit::before {
+    content: "";
+    position: absolute;
+    inset: 12%;
+    border-radius: 50%;
+    border: 1px dashed rgba(233, 210, 176, 0.18);
+    animation: spin 34s linear infinite;
+  }
+
+  .orbit::after {
+    content: "";
+    position: absolute;
+    inset: 20%;
+    border-radius: 50%;
+    border: 1px solid rgba(126, 215, 200, 0.08);
+    box-shadow: inset 0 0 60px rgba(126, 215, 200, 0.08);
+    animation: breathe 7s ease-in-out infinite;
+  }
+
+  .core {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 182px;
+    height: 182px;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    text-align: center;
+    padding: 18px;
+    background:
+      radial-gradient(circle at 35% 30%, rgba(255,255,255,0.18), transparent 28%),
+      linear-gradient(180deg, rgba(242, 178, 79, 0.28), rgba(16, 22, 31, 0.96));
+    border: 1px solid rgba(242, 178, 79, 0.38);
+    box-shadow:
+      0 0 0 18px rgba(242, 178, 79, 0.05),
+      0 24px 70px rgba(0, 0, 0, 0.38);
+    animation: pulse 4.6s ease-in-out infinite;
+  }
+
+  .core .brand {
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    font-size: 0.7rem;
+    color: #ffe0a6;
+    margin-bottom: 6px;
+  }
+
+  .core h3 {
+    font-size: 1.45rem;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+  }
+
+  .core p {
+    margin-top: 8px;
+    color: #f2e7d8;
+    font-size: 0.88rem;
+    line-height: 1.45;
+  }
+
+  .orbit-lines {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .edge {
+    stroke: rgba(233, 210, 176, 0.18);
+    stroke-width: 1.8;
+    stroke-dasharray: 10 10;
+    animation: drift 12s linear infinite;
+  }
+
+  .node {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    min-width: 126px;
+    padding: 11px 12px;
+    border-radius: 18px;
+    background: linear-gradient(180deg, rgba(22, 30, 41, 0.96), rgba(12, 17, 24, 0.98));
+    border: 1px solid rgba(233, 210, 176, 0.12);
+    color: var(--ink);
+    text-align: left;
+    cursor: pointer;
+    box-shadow: 0 14px 24px rgba(0, 0, 0, 0.26);
+    transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+    animation: float 5.8s ease-in-out infinite;
+  }
+
+  .node:hover { transform: translate(-50%, -50%) scale(1.03); }
+  .node.active {
+    border-color: rgba(242, 178, 79, 0.6);
+    background: linear-gradient(180deg, rgba(242, 178, 79, 0.18), rgba(14, 19, 26, 0.98));
+    box-shadow: 0 0 0 10px rgba(242, 178, 79, 0.08), 0 18px 34px rgba(0, 0, 0, 0.34);
+  }
+  .node.active::after {
+    content: "";
+    position: absolute;
+    inset: -6px;
+    border-radius: inherit;
+    border: 1px solid rgba(242, 178, 79, 0.28);
+    animation: ping 2.8s ease-out infinite;
+  }
+
+  .node .tag {
+    display: block;
+    font-size: 0.66rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+
+  .node .name {
+    display: block;
+    font-size: 0.92rem;
+    line-height: 1.2;
+    font-weight: 700;
+  }
+
+  .node .hint {
+    display: block;
+    margin-top: 5px;
+    font-size: 0.76rem;
+    color: #d9ccb8;
+    line-height: 1.3;
+  }
+
+  .tabs {
+    margin: 20px 0 14px;
+    position: sticky;
+    top: 10px;
+    z-index: 4;
+    padding: 10px;
+    border-radius: 999px;
+    background: rgba(10, 14, 20, 0.72);
+    border: 1px solid rgba(233, 210, 176, 0.1);
+    backdrop-filter: blur(12px);
+  }
+
+  .tab {
+    padding: 11px 15px;
+    cursor: pointer;
+    color: #d9cebf;
+    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  }
+
+  .tab:hover { transform: translateY(-1px); }
+  .tab.active {
+    background: linear-gradient(180deg, rgba(242, 178, 79, 0.26), rgba(242, 178, 79, 0.12));
+    border-color: rgba(242, 178, 79, 0.48);
+    color: #fff3db;
+  }
+
+  .views { display: grid; gap: 18px; }
+  .view { display: none; animation: fadeUp 0.36s ease; }
+  .view.active { display: block; }
+
+  .grid2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .grid3 {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .card {
+    padding: 22px;
+  }
+
+  .card + .card { margin-top: 0; }
+
+  .card h2 {
+    font-size: 1.52rem;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+  }
+
+  .card h3 {
+    font-size: 1.02rem;
+    line-height: 1.2;
+  }
+
+  .card .sub {
+    margin-top: 9px;
+    color: var(--muted);
+    line-height: 1.55;
+    font-size: 0.95rem;
+  }
+
+  .tension {
+    margin-top: 16px;
+    display: grid;
+    gap: 12px;
+  }
+
+  .tension-item {
+    padding: 14px 15px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 210, 176, 0.08);
+  }
+
+  .tension-item strong {
+    display: block;
+    margin-bottom: 7px;
+    color: #ffe4aa;
+    font-size: 0.96rem;
+  }
+
+  .tension-item p {
+    color: #e7dac8;
+    line-height: 1.55;
+    font-size: 0.95rem;
+  }
+
+  .callout {
+    margin-top: 14px;
+    padding: 14px 15px;
+    border-radius: 18px;
+    background: rgba(242, 178, 79, 0.1);
+    border: 1px solid rgba(242, 178, 79, 0.2);
+    color: #fff0cf;
+    line-height: 1.55;
+  }
+
+  .compare {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .compare-item {
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 210, 176, 0.08);
+  }
+
+  .compare-item .head {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .compare-item h3 {
+    margin-bottom: 8px;
+  }
+
+  .compare-item p {
+    color: #eadcc9;
+    line-height: 1.55;
+    font-size: 0.95rem;
+  }
+
+  .overview-rail {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: 1.2fr 0.8fr;
+    gap: 14px;
+    align-items: stretch;
+  }
+
+  .lane {
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 210, 176, 0.08);
+  }
+
+  .lane .head {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+
+  .lane .head span {
+    color: var(--muted);
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+  }
+
+  .lane .head strong {
+    font-size: 1rem;
+  }
+
+  .lane ul {
+    margin: 0;
+    padding-left: 18px;
+    color: #eadcc9;
+    line-height: 1.6;
+  }
+
+  .lane li + li { margin-top: 6px; }
+
+  .schedule-rail {
+    margin-top: 16px;
+    display: grid;
+    gap: 12px;
+    position: relative;
+    padding-left: 20px;
+  }
+
+  .schedule-rail::before {
+    content: "";
+    position: absolute;
+    left: 8px;
+    top: 8px;
+    bottom: 8px;
+    width: 2px;
+    background: linear-gradient(180deg, rgba(242, 178, 79, 0.15), rgba(242, 178, 79, 0.75), rgba(126, 215, 200, 0.6), rgba(239, 131, 111, 0.72), rgba(242, 178, 79, 0.12));
+    opacity: 0.82;
+  }
+
+  .step {
+    position: relative;
+    padding: 14px 16px 14px 18px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 210, 176, 0.08);
+  }
+
+  .step::before {
+    content: "";
+    position: absolute;
+    left: -24px;
+    top: 18px;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: rgba(242, 178, 79, 0.38);
+    border: 1px solid rgba(242, 178, 79, 0.78);
+    box-shadow: 0 0 0 8px rgba(242, 178, 79, 0.08);
+  }
+
+  .step.active {
+    border-color: rgba(242, 178, 79, 0.55);
+    background: rgba(242, 178, 79, 0.1);
+  }
+
+  .step.active::before {
+    background: var(--accent);
+    animation: pulse 2.5s ease-in-out infinite;
+  }
+
+  .step .label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+
+  .step h3 {
+    margin-bottom: 5px;
+  }
+
+  .step p {
+    color: #e8dac7;
+    line-height: 1.55;
+    font-size: 0.94rem;
+  }
+
+  .codebox {
+    margin-top: 14px;
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(7, 10, 14, 0.82);
+    border: 1px solid rgba(233, 210, 176, 0.1);
+    font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    color: #d7f0e9;
+    overflow: auto;
+  }
+
+  .codebox .line { display: block; }
+  .codebox .line + .line { margin-top: 4px; }
+  .codebox .comment { color: #9aa699; }
+  .codebox .accent { color: #ffd28a; }
+  .codebox .info { color: #96d2ff; }
+  .codebox .warn { color: #ffb0a1; }
+
+  .overview-note {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 18px;
+    border: 1px solid rgba(239, 131, 111, 0.22);
+    background: rgba(239, 131, 111, 0.08);
+    color: #ffe4df;
+    line-height: 1.6;
+  }
+
+  .network-shell {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+    gap: 18px;
+    align-items: start;
+  }
+
+  .network-map {
+    min-height: 660px;
+    padding: 0;
+    position: relative;
+  }
+
+  .network-map .map-label {
+    position: absolute;
+    left: 22px;
+    top: 18px;
+    z-index: 2;
+    color: var(--muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+  }
+
+  .network-map svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .node {
+    z-index: 2;
+  }
+
+  .node.main {
+    left: 50%;
+    top: 51%;
+    min-width: 182px;
+    min-height: 182px;
+    border-radius: 50%;
+    padding: 18px;
+    display: grid;
+    place-items: center;
+    text-align: center;
+  }
+
+  .node.main .name {
+    font-size: 1.1rem;
+  }
+
+  .node.main .hint {
+    max-width: 20ch;
+  }
+
+  .inspector {
+    position: sticky;
+    top: 92px;
+    padding: 22px;
+  }
+
+  .inspector .eyebrow {
+    font-size: 0.72rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 10px;
+  }
+
+  .inspector h3 {
+    font-size: 1.52rem;
+    line-height: 1.08;
+    letter-spacing: -0.03em;
+  }
+
+  .inspector .badge {
+    display: inline-flex;
+    margin-top: 10px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    background: rgba(126, 215, 200, 0.1);
+    border: 1px solid rgba(126, 215, 200, 0.18);
+    color: #daf7f0;
+    font-size: 0.8rem;
+  }
+
+  .inspector p {
+    margin-top: 14px;
+    color: #eadcc9;
+    line-height: 1.66;
+    font-size: 0.96rem;
+  }
+
+  .detail-list {
+    margin-top: 14px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .detail-list .row {
+    padding: 12px 13px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 210, 176, 0.08);
+    line-height: 1.5;
+  }
+
+  .detail-list .row strong {
+    display: block;
+    color: #ffe2a9;
+    margin-bottom: 4px;
+  }
+
+  .detail-list .row code {
+    font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+    color: #aee0ff;
+  }
+
+  .state-grid {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .state {
+    min-height: 96px;
+    padding: 13px 12px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 210, 176, 0.08);
+    transition: transform 0.22s ease, border-color 0.22s ease, background 0.22s ease;
+  }
+
+  .state.active {
+    transform: translateY(-4px);
+    background: rgba(126, 215, 200, 0.1);
+    border-color: rgba(126, 215, 200, 0.42);
+    box-shadow: 0 0 0 8px rgba(126, 215, 200, 0.06);
+  }
+
+  .state .name {
+    display: block;
+    font-size: 0.82rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .state .desc {
+    line-height: 1.45;
+    color: #eadcc9;
+    font-size: 0.93rem;
+  }
+
+  .ipc-list {
+    margin-top: 16px;
+    display: grid;
+    gap: 10px;
+  }
+
+  .ipc {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    padding: 13px 14px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 210, 176, 0.08);
+  }
+
+  .ipc strong {
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .ipc span {
+    color: var(--muted);
+    font-size: 0.88rem;
+    line-height: 1.45;
+  }
+
+  .jsonbox {
+    margin-top: 14px;
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(7, 10, 14, 0.82);
+    border: 1px solid rgba(233, 210, 176, 0.1);
+    font-family: "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+    font-size: 0.88rem;
+    color: #d2ece4;
+    line-height: 1.55;
+    white-space: pre-wrap;
+  }
+
+  .warning {
+    margin-top: 16px;
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(239, 131, 111, 0.1);
+    border: 1px solid rgba(239, 131, 111, 0.22);
+    color: #ffe5e0;
+    line-height: 1.62;
+  }
+
+  .data-grid {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .table {
+    padding: 16px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 210, 176, 0.08);
+  }
+
+  .table .head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+
+  .table .head span {
+    color: var(--muted);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+  }
+
+  .table ul {
+    margin: 0;
+    padding-left: 18px;
+    line-height: 1.58;
+    color: #eadcc9;
+  }
+
+  .table li + li { margin-top: 7px; }
+
+  .stack {
+    margin-top: 16px;
+    display: grid;
+    gap: 12px;
+  }
+
+  .stack-item {
+    padding: 14px 15px;
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 210, 176, 0.08);
+    line-height: 1.55;
+  }
+
+  .stack-item strong {
+    display: block;
+    margin-bottom: 6px;
+    color: #ffe4aa;
+  }
+
+  .foot-grid {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .mini-card {
+    padding: 14px 15px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(233, 210, 176, 0.08);
+    line-height: 1.55;
+    color: #eadcc9;
+  }
+
+  .mini-card strong {
+    display: block;
+    margin-bottom: 6px;
+    color: #ffe2a9;
+  }
+
+  .footer {
+    margin: 18px 2px 0;
+    padding: 8px 2px 2px;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.5;
+    text-align: center;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 18px rgba(242, 178, 79, 0.05), 0 24px 70px rgba(0, 0, 0, 0.38); }
+    50% { box-shadow: 0 0 0 26px rgba(242, 178, 79, 0.08), 0 24px 70px rgba(0, 0, 0, 0.38); }
+  }
+
+  @keyframes breathe {
+    0%, 100% { opacity: 0.55; transform: scale(1); }
+    50% { opacity: 0.9; transform: scale(1.02); }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translate(-50%, -50%) translateY(0); }
+    50% { transform: translate(-50%, -50%) translateY(-6px); }
+  }
+
+  @keyframes drift {
+    from { stroke-dashoffset: 0; }
+    to { stroke-dashoffset: 240; }
+  }
+
+  @keyframes ping {
+    0% { opacity: 0; transform: scale(0.92); }
+    35% { opacity: 0.9; }
+    100% { opacity: 0; transform: scale(1.16); }
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (max-width: 1180px) {
+    .hero,
+    .network-shell,
+    .grid2,
+    .overview-rail,
+    .data-grid,
+    .foot-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .hero-visual { min-height: 500px; }
+    .network-map { min-height: 560px; }
+    .inspector { position: relative; top: auto; }
+    .grid3 { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 760px) {
+    .shell { width: min(100% - 18px, 100%); padding-top: 12px; }
+    .hero-copy, .hero-visual, .card, .inspector { padding: 18px; }
+    .tabs { border-radius: 22px; }
+    .tab { width: calc(50% - 5px); text-align: center; }
+    h1 { max-width: 14ch; }
+    .story-track { grid-template-columns: 1fr 1fr; }
+    .story-step { min-height: 82px; }
+    .state-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .compare { grid-template-columns: 1fr; }
+    .node, .node.main {
+      min-width: 112px;
+      padding: 10px 11px;
+    }
+    .node.main {
+      min-width: 156px;
+      min-height: 156px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <section class="hero panel">
+    <div class="hero-copy">
+      <div class="kicker">Technical build explainer</div>
+      <h1>Focus Warden</h1>
+      <p class="lede">
+        This page explains how the repo is assembled, not what it promises to do. The build starts
+        at the CLI entry point, loads configuration, fans out into a simple planner runtime and a
+        legacy daemon runtime, and then connects scheduling, UI, SQLite persistence, and a local
+        Unix-socket control plane.
+      </p>
+      <div class="chips">
+        <span class="chip">Entry point</span>
+        <span class="chip">Config loader</span>
+        <span class="chip">Pure scheduler</span>
+        <span class="chip">PyQt6 runtime</span>
+        <span class="chip">SQLite persistence</span>
+        <span class="chip">Unix socket IPC</span>
+      </div>
+      <div class="terminal" aria-label="Command surface">
+        <div class="line"><span class="prompt">$</span> focus-warden run</div>
+        <div class="line"><span class="dim">Default build path:</span> enters <span class="path">SimpleTodoApp</span>, the lightweight planner runtime.</div>
+        <div class="line"><span class="prompt">$</span> focus-warden run-legacy</div>
+        <div class="line"><span class="dim">Legacy build path:</span> starts the daemon, blocker, notifications, and control socket.</div>
+        <div class="line"><span class="prompt">$</span> focus-warden pause <span class="dim">| resume | status | give-up</span></div>
+      </div>
+      <div class="story panel">
+        <div class="story-head">
+          <div>
+            <div class="kicker" style="margin:0 0 6px;">How the code was assembled</div>
+            <div class="story-title" id="story-title">Package and entry point</div>
+          </div>
+          <div class="story-index" id="story-index">1 / 6</div>
+        </div>
+        <p class="story-body" id="story-body">
+          The build starts with `pyproject.toml`, which declares the package, dependencies, and the
+          `focus-warden` console script. Everything else hangs off that root.
+        </p>
+        <div class="story-track" id="story-track">
+          <div class="story-step active" data-step="0">
+            <span class="label">1. Bootstrap</span>
+            <span class="text">Define the package and CLI entry.</span>
+          </div>
+          <div class="story-step" data-step="1">
+            <span class="label">2. Config</span>
+            <span class="text">Load TOML into typed dataclasses.</span>
+          </div>
+          <div class="story-step" data-step="2">
+            <span class="label">3. Store</span>
+            <span class="text">Create SQLite tables and migrations.</span>
+          </div>
+          <div class="story-step" data-step="3">
+            <span class="label">4. Algorithm</span>
+            <span class="text">Build a pure schedule from tasks.</span>
+          </div>
+          <div class="story-step" data-step="4">
+            <span class="label">5. Runtime</span>
+            <span class="text">Wire Qt windows and the daemon loop.</span>
+          </div>
+          <div class="story-step" data-step="5">
+            <span class="label">6. IPC</span>
+            <span class="text">Expose pause, resume, and status.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-visual panel">
+      <div class="orbit" aria-label="Architecture orbit">
+        <svg class="orbit-lines" viewBox="0 0 1000 700" preserveAspectRatio="none" aria-hidden="true">
+          <defs>
+            <linearGradient id="edgeGrad" x1="0%" x2="100%" y1="0%" y2="0%">
+              <stop offset="0%" stop-color="rgba(242,178,79,0.05)" />
+              <stop offset="50%" stop-color="rgba(233,210,176,0.55)" />
+              <stop offset="100%" stop-color="rgba(126,215,200,0.22)" />
+            </linearGradient>
+          </defs>
+          <line class="edge" x1="500" y1="350" x2="500" y2="120" />
+          <line class="edge" x1="500" y1="350" x2="245" y2="195" />
+          <line class="edge" x1="500" y1="350" x2="185" y2="430" />
+          <line class="edge" x1="500" y1="350" x2="245" y2="590" />
+          <line class="edge" x1="500" y1="350" x2="760" y2="190" />
+          <line class="edge" x1="500" y1="350" x2="825" y2="360" />
+          <line class="edge" x1="500" y1="350" x2="760" y2="585" />
+          <line class="edge" x1="500" y1="350" x2="500" y2="645" />
+        </svg>
+
+        <button class="node main active" data-node="main" style="left:50%; top:51%;" type="button">
+          <span class="tag">Entry point</span>
+          <span class="name">focus-warden</span>
+          <span class="hint">CLI router and runtime selector.</span>
+        </button>
+        <button class="node" data-node="simple_app" style="left:25%; top:24%;" type="button">
+          <span class="tag">Default runtime</span>
+          <span class="name">simple_app.py</span>
+          <span class="hint">Chooses planner or dashboard at startup.</span>
+        </button>
+        <button class="node" data-node="simple_store" style="left:18%; top:62%;" type="button">
+          <span class="tag">Local store</span>
+          <span class="name">simple_store.py</span>
+          <span class="hint">Owns plans, runs, and schema migration.</span>
+        </button>
+        <button class="node" data-node="simple_ui" style="left:25%; top:83%;" type="button">
+          <span class="tag">Qt windows</span>
+          <span class="name">simple_ui.py</span>
+          <span class="hint">Planner, timer, and dashboard widgets.</span>
+        </button>
+        <button class="node" data-node="notion_client" style="left:74%; top:24%;" type="button">
+          <span class="tag">Source of truth</span>
+          <span class="name">notion_client.py</span>
+          <span class="hint">Query adapter and task normalizer.</span>
+        </button>
+        <button class="node" data-node="scheduler" style="left:84%; top:50%;" type="button">
+          <span class="tag">Pure logic</span>
+          <span class="name">scheduler.py</span>
+          <span class="hint">Pure schedule builder.</span>
+        </button>
+        <button class="node" data-node="daemon" style="left:74%; top:82%;" type="button">
+          <span class="tag">Legacy engine</span>
+          <span class="name">daemon.py</span>
+          <span class="hint">Event loop, sessions, and logs.</span>
+        </button>
+        <button class="node" data-node="ui" style="left:50%; top:90%;" type="button">
+          <span class="tag">Blocker</span>
+          <span class="name">ui.py</span>
+          <span class="hint">Fullscreen task and break gate.</span>
+        </button>
+        <button class="node" data-node="control" style="left:50%; top:13%;" type="button">
+          <span class="tag">IPC</span>
+          <span class="name">control_server.py</span>
+          <span class="hint">Unix socket JSON server.</span>
+        </button>
+        <button class="node" data-node="db" style="left:50%; top:63%;" type="button">
+          <span class="tag">Persistence</span>
+          <span class="name">db.py</span>
+          <span class="hint">Sessions, tasks, and interruptions.</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" style="margin-top:18px; padding:18px;">
+    <div class="metric-row" aria-label="Key metrics">
+      <span class="metric"><strong data-count="2">0</strong><small>runtime paths</small></span>
+      <span class="metric"><strong data-count="2">0</strong><small>SQLite stores</small></span>
+      <span class="metric"><strong data-count="1">0</strong><small>pure scheduler</small></span>
+      <span class="metric"><strong data-count="8">0</strong><small>state machine states</small></span>
+      <span class="metric"><strong data-count="6">0</strong><small>build stages</small></span>
+      <span class="metric"><strong data-count="1">0</strong><small>local IPC socket</small></span>
+    </div>
+  </section>
+
+  <nav class="tabs" aria-label="Explainer views">
+    <button class="tab active" data-view="overview" type="button">Overview</button>
+    <button class="tab" data-view="network" type="button">Graph</button>
+    <button class="tab" data-view="schedule" type="button">Algorithm</button>
+    <button class="tab" data-view="control" type="button">Runtime</button>
+    <button class="tab" data-view="storage" type="button">Persistence</button>
+  </nav>
+
+  <main class="views">
+    <section class="view active" data-panel="overview">
+      <div class="grid2">
+        <article class="card panel">
+          <h2>How the build is layered</h2>
+          <p class="sub">
+            The code is deliberately split into layers so each part has one job. CLI routing and
+            config loading happen first, the persistence layer comes next, the schedule builder stays
+            pure, and the UI/runtime code gets to handle side effects later.
+          </p>
+          <div class="tension">
+            <div class="tension-item">
+              <strong>Bootstrap vs runtime</strong>
+              <p><code>pyproject.toml</code> and <code>main.py</code> define how the package starts before any session logic exists.</p>
+            </div>
+            <div class="tension-item">
+              <strong>Pure logic vs side effects</strong>
+              <p><code>scheduler.py</code> computes a plan without touching the world. The daemon, DB, UI, and notifications handle effects.</p>
+            </div>
+            <div class="tension-item">
+              <strong>Default path vs legacy path</strong>
+              <p>The current service launches <code>focus-warden run</code>, which hits the simple planner path instead of the daemon.</p>
+            </div>
+          </div>
+          <div class="callout">
+            The most important implementation detail: <strong>the service points at
+            <code>focus-warden run</code></strong>, so the shipped default behavior is the planner
+            runtime. The daemon is present, but it is not the installed entry point.
+          </div>
+        </article>
+
+        <article class="card panel">
+          <h2>Construction order</h2>
+          <div class="compare">
+            <div class="compare-item">
+              <div class="head">1. Package entry</div>
+              <h3>pyproject.toml</h3>
+              <p>
+                Declares the project metadata, dependencies, and the <code>focus-warden</code> console
+                script that points into <code>focus_warden.main:main</code>.
+              </p>
+            </div>
+            <div class="compare-item">
+              <div class="head">2. Runtime dispatch</div>
+              <h3>main.py</h3>
+              <p>
+                Parses commands, loads config, and chooses between the simple path, the legacy daemon,
+                the control verbs, and the pure schedule printer.
+              </p>
+            </div>
+          </div>
+          <div class="overview-rail">
+            <div class="lane">
+              <div class="head"><strong>Layered modules</strong><span>source</span></div>
+              <ul>
+                <li><code>config.py</code> turns TOML into dataclasses and expands paths.</li>
+                <li><code>simple_store.py</code> creates the local planner database and migrations.</li>
+                <li><code>scheduler.py</code> remains pure and returns ordered schedule items.</li>
+                <li><code>daemon.py</code> wires the event loop, state machine, and persistence.</li>
+              </ul>
+            </div>
+            <div class="lane">
+              <div class="head"><strong>Build surfaces</strong><span>runtime</span></div>
+              <ul>
+                <li><code>simple_ui.py</code> renders the planner, timer, and dashboard windows.</li>
+                <li><code>ui.py</code> provides the fullscreen blocker and confirmation gate.</li>
+                <li><code>control_server.py</code> exposes a Unix-socket JSON command channel.</li>
+                <li><code>db.py</code> records sessions, tasks, interruptions, and control events.</li>
+              </ul>
+            </div>
+          </div>
+        </article>
+      </div>
+      <div class="grid2" style="margin-top:18px;">
+        <article class="card panel">
+          <h2>Why this shape works</h2>
+          <div class="stack">
+            <div class="stack-item">
+              <strong>Side effects are isolated</strong>
+              The schedule builder can be tested in isolation because it does not depend on Qt, SQLite, or the current wall clock.
+            </div>
+            <div class="stack-item">
+              <strong>State is explicit</strong>
+              The daemon uses a small state machine instead of ad hoc globals so pause, resume, and give-up are inspectable transitions.
+            </div>
+            <div class="stack-item">
+              <strong>Local storage is simple</strong>
+              Both SQLite stores are schema-first and low ceremony, which keeps the runtime logic readable.
+            </div>
+          </div>
+        </article>
+        <article class="card panel">
+          <h2>Build chain snippet</h2>
+          <div class="codebox">
+            <span class="line"><span class="comment"># build chain</span></span>
+            <span class="line"><span class="accent">pyproject.toml</span> → <span class="accent">main.py</span></span>
+            <span class="line">main.py → <span class="info">load_config()</span></span>
+            <span class="line">load_config() → <span class="info">Config</span> dataclasses</span>
+            <span class="line">Config → <span class="info">SimpleTodoApp</span> or <span class="info">Daemon</span></span>
+            <span class="line">Daemon → <span class="info">scheduler</span> + <span class="info">ui</span> + <span class="info">db</span> + <span class="info">control_server</span></span>
+            <span class="line"><span class="comment"># runtime split</span></span>
+            <span class="line"><span class="warn">run</span> defaults to the simple path; <span class="warn">run-legacy</span> enters the daemon.</span>
+          </div>
+        </article>
+      </div>
+      <div class="overview-note">
+        This page is intentionally about implementation shape. The repo is a layered Python app
+        with one public CLI, two runtime paths, one pure schedule function, two SQLite stores, one
+        socket control plane, and a Qt blocker/runtime shell around them.
+      </div>
+    </section>
+
+    <section class="view" data-panel="network">
+      <div class="network-shell">
+        <article class="card panel network-map">
+          <div class="map-label">Clickable module graph</div>
+          <svg viewBox="0 0 1000 700" preserveAspectRatio="none" aria-hidden="true">
+            <line class="edge" x1="500" y1="350" x2="500" y2="120" />
+            <line class="edge" x1="500" y1="350" x2="245" y2="195" />
+            <line class="edge" x1="500" y1="350" x2="185" y2="430" />
+            <line class="edge" x1="500" y1="350" x2="245" y2="590" />
+            <line class="edge" x1="500" y1="350" x2="760" y2="190" />
+            <line class="edge" x1="500" y1="350" x2="825" y2="360" />
+            <line class="edge" x1="500" y1="350" x2="760" y2="585" />
+            <line class="edge" x1="500" y1="350" x2="500" y2="645" />
+          </svg>
+          <button class="node main active" data-node="main" style="left:50%; top:51%;" type="button">
+            <span class="tag">Entry point</span>
+            <span class="name">main.py</span>
+            <span class="hint">Routes commands and picks the runtime.</span>
+          </button>
+          <button class="node" data-node="simple_app" style="left:25%; top:24%;" type="button">
+            <span class="tag">Default runtime</span>
+            <span class="name">simple_app.py</span>
+            <span class="hint">Chooses planner or dashboard at startup.</span>
+          </button>
+          <button class="node" data-node="simple_store" style="left:18%; top:62%;" type="button">
+            <span class="tag">Local store</span>
+            <span class="name">simple_store.py</span>
+            <span class="hint">Owns plans, runs, and schema migration.</span>
+          </button>
+          <button class="node" data-node="simple_ui" style="left:25%; top:83%;" type="button">
+            <span class="tag">Qt windows</span>
+            <span class="name">simple_ui.py</span>
+            <span class="hint">Planner, timer, and dashboard widgets.</span>
+          </button>
+          <button class="node" data-node="notion_client" style="left:74%; top:24%;" type="button">
+            <span class="tag">Task source</span>
+            <span class="name">notion_client.py</span>
+            <span class="hint">Query adapter and task normalizer.</span>
+          </button>
+          <button class="node" data-node="scheduler" style="left:84%; top:50%;" type="button">
+            <span class="tag">Pure logic</span>
+            <span class="name">scheduler.py</span>
+            <span class="hint">Pure schedule builder.</span>
+          </button>
+          <button class="node" data-node="daemon" style="left:74%; top:82%;" type="button">
+            <span class="tag">Legacy engine</span>
+            <span class="name">daemon.py</span>
+            <span class="hint">Event loop, sessions, and logs.</span>
+          </button>
+          <button class="node" data-node="ui" style="left:50%; top:90%;" type="button">
+            <span class="tag">Blocker UI</span>
+            <span class="name">ui.py</span>
+            <span class="hint">Fullscreen task and break gate.</span>
+          </button>
+          <button class="node" data-node="control" style="left:50%; top:13%;" type="button">
+            <span class="tag">Control plane</span>
+            <span class="name">control_server.py</span>
+            <span class="hint">Unix socket JSON server.</span>
+          </button>
+          <button class="node" data-node="db" style="left:50%; top:63%;" type="button">
+            <span class="tag">Persistence</span>
+            <span class="name">db.py</span>
+            <span class="hint">Sessions, tasks, and interruptions.</span>
+          </button>
+          <div class="core">
+            <div>
+              <div class="brand">focus warden</div>
+              <h3>Module dependencies</h3>
+              <p>The graph shows which files are pure, which files wire side effects, and which files persist state.</p>
+            </div>
+          </div>
+        </article>
+
+        <aside class="card panel inspector" id="inspector">
+          <div class="eyebrow">Inspector</div>
+          <h3 id="inspector-title">main.py</h3>
+          <div class="badge" id="inspector-badge">CLI router</div>
+          <p id="inspector-summary">
+            `main.py` is the top-level switchboard. It decides whether the user gets the simple
+            planner runtime, the legacy daemon, or a control command.
+          </p>
+          <div class="detail-list">
+            <div class="row">
+              <strong>Why it matters</strong>
+              This file defines the dependency tree. Every other runtime path hangs off the command
+              parser and the config loader.
+            </div>
+            <div class="row">
+              <strong>File</strong>
+              <code id="inspector-file">src/focus_warden/main.py</code>
+            </div>
+            <div class="row">
+              <strong>Signals to watch</strong>
+              <span id="inspector-signals">focus-warden run, focus-warden run-legacy, pause/resume/status/give-up.</span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="view" data-panel="schedule">
+      <div class="grid2">
+        <article class="card panel">
+          <h2>The schedule engine</h2>
+          <p class="sub">
+            `scheduler.py` is a pure function. It consumes a task list, a session start, and config
+            values, then emits ordered <code>ScheduleItem</code> objects without touching Qt, SQLite,
+            or the current clock.
+          </p>
+          <div class="schedule-rail" id="schedule-rail">
+            <div class="step active">
+              <div class="label">Stage 1</div>
+              <h3>Initialize cursor</h3>
+              <p>Start from <code>session_start</code> plus the grace period. Derive <code>shutdown_deadline</code> and the gym anchor up front.</p>
+            </div>
+            <div class="step">
+              <div class="label">Stage 2</div>
+              <h3>Place task blocks</h3>
+              <p>Walk the normalized task list in order and allocate <code>estimate_minutes</code> or the default task length.</p>
+            </div>
+            <div class="step">
+              <div class="label">Stage 3</div>
+              <h3>Inject interruptions</h3>
+              <p>Insert stretch breaks whenever <code>accumulated_work</code> crosses the interval threshold. Insert the gym break once when the cursor reaches the configured offset.</p>
+            </div>
+            <div class="step">
+              <div class="label">Stage 4</div>
+              <h3>Clamp to deadline</h3>
+              <p>If a task would run past the shutdown boundary, clip it or stop scheduling. Then append the warning window and final shutdown item.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="card panel">
+          <h2>Rule summary in code shape</h2>
+          <div class="codebox">
+            <span class="line"><span class="comment"># build_schedule(tasks, session_start, config)</span></span>
+            <span class="line">cursor = session_start + grace_seconds</span>
+            <span class="line">shutdown_deadline = session_start.replace(hard_shutdown_time)</span>
+            <span class="line">gym_time = session_start + gym_offset_hours</span>
+            <span class="line">for task in tasks:</span>
+            <span class="line">  maybe insert stretch break</span>
+            <span class="line">  maybe insert gym break once</span>
+            <span class="line">  duration = task.estimate_minutes or default_task_minutes</span>
+            <span class="line">  if cursor + duration crosses shutdown_deadline:</span>
+            <span class="line">    clip or stop</span>
+            <span class="line">append warning item and hard shutdown item</span>
+          </div>
+          <div class="stack">
+            <div class="stack-item">
+              <strong>Deterministic, not predictive</strong>
+              The function always returns the same schedule for the same inputs because it never asks the wall clock for “now”.
+            </div>
+            <div class="stack-item">
+              <strong>Pause shifts the future</strong>
+              The daemon path mutates the scheduled start times after resume, but the absolute shutdown deadline stays fixed.
+            </div>
+            <div class="stack-item">
+              <strong>Breaks are first-class</strong>
+              Stretch and gym are real schedule entries, not UI reminders or post-processing notes.
+            </div>
+          </div>
+        </article>
+      </div>
+
+      <div class="grid3" style="margin-top:18px;">
+        <div class="mini-card">
+          <strong>Cursor</strong>
+          The cursor moves forward through tasks and interruptions, which keeps the schedule monotonic.
+        </div>
+        <div class="mini-card">
+          <strong>Accumulated work</strong>
+          The stretch insertion rule keys off work time accrued, not raw task count.
+        </div>
+        <div class="mini-card">
+          <strong>Deadline clamp</strong>
+          The final shutdown item is always appended when hard shutdown is enabled, even if no tasks remain.
+        </div>
+      </div>
+    </section>
+
+    <section class="view" data-panel="control">
+      <div class="grid2">
+        <article class="card panel">
+          <h2>Runtime loop and state machine</h2>
+          <p class="sub">
+            `daemon.py` runs a manual Qt event loop, polls the control socket on each tick, and keeps
+            the session inside a small set of explicit states. That structure keeps pause, resume,
+            give-up, and finish logic from leaking into hidden globals.
+          </p>
+          <div class="state-grid" id="state-grid">
+            <div class="state active">
+              <span class="name">idle</span>
+              <span class="desc">The daemon has not started a session yet.</span>
+            </div>
+            <div class="state">
+              <span class="name">awaiting_task_start</span>
+              <span class="desc">The blocker is visible and waiting for task confirmation.</span>
+            </div>
+            <div class="state">
+              <span class="name">task_active</span>
+              <span class="desc">A task timer is running and the task row has been activated.</span>
+            </div>
+            <div class="state">
+              <span class="name">awaiting_break_start</span>
+              <span class="desc">The next break is queued but not confirmed yet.</span>
+            </div>
+            <div class="state">
+              <span class="name">break_active</span>
+              <span class="desc">Stretch or gym is active under the same lifecycle.</span>
+            </div>
+            <div class="state">
+              <span class="name">paused</span>
+              <span class="desc">Future schedule items are frozen until resume shifts them forward.</span>
+            </div>
+            <div class="state">
+              <span class="name">given_up</span>
+              <span class="desc">The session is marked abandoned and the daemon exits.</span>
+            </div>
+            <div class="state">
+              <span class="name">finished</span>
+              <span class="desc">The session ended normally or by shutdown.</span>
+            </div>
+          </div>
+        </article>
+
+        <article class="card panel">
+          <h2>Socket protocol</h2>
+          <p class="sub">
+            External controls go through a Unix domain socket at
+            <code>~/.local/state/focus-warden/control.sock</code>. The server binds once, accepts a
+            single JSON object per connection, and returns a JSON response.
+          </p>
+          <div class="ipc-list">
+            <div class="ipc">
+              <div>
+                <strong>pause</strong>
+                <span>Transitions to paused, records an interruption row, and starts the pause timer.</span>
+              </div>
+              <div class="pill" style="padding:8px 12px;">local only</div>
+            </div>
+            <div class="ipc">
+              <div>
+                <strong>resume</strong>
+                <span>Restores the previous state and shifts later items by the paused duration.</span>
+              </div>
+              <div class="pill" style="padding:8px 12px;">time shift</div>
+            </div>
+            <div class="ipc">
+              <div>
+                <strong>give_up</strong>
+                <span>Marks the session given up, closes the blocker, and stops the daemon.</span>
+              </div>
+              <div class="pill" style="padding:8px 12px;">3 attempts</div>
+            </div>
+            <div class="ipc">
+              <div>
+                <strong>status</strong>
+                <span>Returns the live state, current item title, session id, and remaining schedule length.</span>
+              </div>
+              <div class="pill" style="padding:8px 12px;">read only</div>
+            </div>
+          </div>
+          <div class="jsonbox" id="status-box">request:
+{
+  "command": "pause"
+}
+
+response:
+{
+  "status": "paused"
+}</div>
+        </article>
+      </div>
+
+      <div class="grid2" style="margin-top:18px;">
+        <article class="card panel">
+          <h2>Fullscreen gate internals</h2>
+          <div class="stack">
+            <div class="stack-item">
+              <strong>Task start gate</strong>
+              In <code>ui.py</code>, the task gate enables Start only when the typed text matches the task title.
+            </div>
+            <div class="stack-item">
+              <strong>Break start gate</strong>
+              Break entries hide the text field and turn the confirm button into a break-start button.
+            </div>
+            <div class="stack-item">
+              <strong>Escape is blocked</strong>
+              The window ignores Escape and refuses to close unless the confirm path has already fired.
+            </div>
+          </div>
+        </article>
+        <article class="card panel">
+          <h2>Trust boundary</h2>
+          <div class="warning">
+            The repo is honest about its own limits. This is a strong fullscreen blocker, not a
+            cryptographic kiosk lock or compositor-level session lock.
+          </div>
+          <div class="stack">
+            <div class="stack-item">
+              <strong>Security model</strong>
+              The code gives local friction, not hardened OS enforcement.
+            </div>
+            <div class="stack-item">
+              <strong>Operational model</strong>
+              It works best as a systemd user service with local desktop integration and no network dependency.
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="view" data-panel="storage">
+      <div class="grid2">
+        <article class="card panel">
+          <h2>Persistence layers</h2>
+          <p class="sub">
+            The simple runtime and the daemon runtime do not share a database. They keep separate
+            stores because their lifetimes and schemas are different.
+          </p>
+          <div class="data-grid">
+            <div class="table">
+              <div class="head"><strong>simple_todos.db</strong><span>planner runtime</span></div>
+              <ul>
+                <li><code>plans</code></li>
+                <li><code>plan_tasks</code></li>
+                <li><code>daily_sessions</code></li>
+                <li><code>task_runs</code></li>
+              </ul>
+            </div>
+            <div class="table">
+              <div class="head"><strong>warden.db</strong><span>daemon runtime</span></div>
+              <ul>
+                <li><code>sessions</code></li>
+                <li><code>tasks</code></li>
+                <li><code>interruptions</code></li>
+                <li><code>control_events</code></li>
+              </ul>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="stack-item">
+              <strong>Simple store</strong>
+              `SimpleTodoStore` self-creates tables, adds missing columns, and can migrate legacy JSON into SQLite on startup.
+            </div>
+            <div class="stack-item">
+              <strong>Daemon store</strong>
+              `Database` uses a fixed schema with session, task, interruption, and control-event tables.
+            </div>
+          </div>
+        </article>
+
+        <article class="card panel">
+          <h2>Bootstrap surfaces</h2>
+          <div class="stack">
+            <div class="stack-item">
+              <strong>Config loader</strong>
+              `config.py` reads TOML, expands user paths, and maps sections into typed dataclasses.
+            </div>
+            <div class="stack-item">
+              <strong>Package entry</strong>
+              `pyproject.toml` exposes the console script and declares the runtime dependencies.
+            </div>
+            <div class="stack-item">
+              <strong>Service wiring</strong>
+              `systemd/focus-warden.service` launches `focus-warden run`, so the default service follows the simple path.
+            </div>
+          </div>
+          <div class="codebox">
+            <span class="line"><span class="comment"># service and config seam</span></span>
+            <span class="line"><span class="accent">ExecStart=/home/ukd/projects/focus-warden/.venv/bin/focus-warden run</span></span>
+            <span class="line"><span class="comment"># config.toml chooses which path the runtime takes after startup.</span></span>
+            <span class="line"><span class="comment"># config.example.toml documents the expected Notion and schedule fields.</span></span>
+          </div>
+        </article>
+      </div>
+
+      <div class="grid2" style="margin-top:18px;">
+        <article class="card panel">
+          <h2>Source map</h2>
+          <div class="foot-grid">
+            <div class="mini-card"><strong>main.py</strong> CLI router and command switchboard.</div>
+            <div class="mini-card"><strong>simple_app.py</strong> Default runtime selector and planner launcher.</div>
+            <div class="mini-card"><strong>simple_ui.py</strong> Planner, timer, and dashboard windows.</div>
+            <div class="mini-card"><strong>simple_store.py</strong> Local plan/session/task persistence with migration.</div>
+            <div class="mini-card"><strong>daemon.py</strong> Legacy session engine and blocker wiring.</div>
+            <div class="mini-card"><strong>db.py</strong> SQLite schema for sessions, tasks, interruptions, events.</div>
+          </div>
+        </article>
+        <article class="card panel">
+          <h2>What to remember</h2>
+          <div class="stack">
+            <div class="stack-item">
+              <strong>The build is layered</strong>
+              Entry point, config, storage, algorithm, runtime, and IPC are separated to keep the code readable.
+            </div>
+            <div class="stack-item">
+              <strong>The default runtime matters</strong>
+              The service launches the simple path, so the shipped behavior is not the daemon even though the daemon exists.
+            </div>
+            <div class="stack-item">
+              <strong>Pure logic is the anchor</strong>
+              The schedule builder is the easiest place to test because it is side-effect free.
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <div class="footer">
+    Built from the actual repo files: <code>main.py</code>, <code>simple_app.py</code>,
+    <code>simple_ui.py</code>, <code>simple_store.py</code>, <code>daemon.py</code>,
+    <code>scheduler.py</code>, <code>notion_client.py</code>, <code>ui.py</code>,
+    <code>control_server.py</code>, <code>db.py</code>, and <code>config.example.toml</code>.
+  </div>
+</div>
+
+<script>
+  const views = [...document.querySelectorAll(".view")];
+  const tabs = [...document.querySelectorAll(".tab")];
+  const nodes = [...document.querySelectorAll(".node")];
+  const storySteps = [...document.querySelectorAll(".story-step")];
+  const stateCards = [...document.querySelectorAll(".state")];
+  const metrics = [...document.querySelectorAll("[data-count]")];
+
+  const viewStorageKey = "focus-warden-view";
+  const nodeData = {
+    main: {
+      title: "main.py",
+      badge: "CLI router",
+      file: "src/focus_warden/main.py",
+      summary:
+        "This is the top-level switchboard. It decides whether the runtime uses the simple path, the legacy daemon, or a local control command.",
+      signals: "focus-warden run, run-legacy, pause, resume, status, give-up, fetch-tasks, show-schedule.",
+      why:
+        "The dependency tree starts here. The CLI parser and config loader determine every later branch.",
+    },
+    simple_app: {
+      title: "simple_app.py",
+      badge: "Default runtime",
+      file: "src/focus_warden/simple_app.py",
+      summary:
+        "Chooses between the planner and dashboard windows based on whether a local plan exists for the target day.",
+      signals: "SimpleTodoApp, morning and night launch windows, plan-to-dashboard handoff.",
+      why:
+        "It is the default runtime path, so it defines the shipped user experience even though the daemon exists.",
+    },
+    simple_store: {
+      title: "simple_store.py",
+      badge: "Local planning DB",
+      file: "src/focus_warden/simple_store.py",
+      summary:
+        "Owns the planner SQLite schema, session rows, task runs, and the one-time JSON migration path.",
+      signals: "plans, plan_tasks, daily_sessions, task_runs.",
+      why:
+        "It keeps the simple runtime self-contained and avoids coupling the dashboard to the daemon store.",
+    },
+    simple_ui: {
+      title: "simple_ui.py",
+      badge: "Qt windows",
+      file: "src/focus_warden/simple_ui.py",
+      summary:
+        "Renders the planner, schedule dashboard, and task timer in PyQt6 widgets.",
+      signals: "PlannerWindow, ScheduleDashboardWindow, TaskTimerWindow.",
+      why:
+        "This is where the default runtime stays in the UI layer instead of leaking into storage or scheduling code.",
+    },
+    notion_client: {
+      title: "notion_client.py",
+      badge: "Task import",
+      file: "src/focus_warden/notion_client.py",
+      summary:
+        "Resolves database versus data source access, applies property filters, paginates queries, and normalizes tasks.",
+      signals: "title, date, estimate, status/select/multi-select filters.",
+      why:
+        "The scheduler only works because this module turns Notion pages into a stable local task model first.",
+    },
+    scheduler: {
+      title: "scheduler.py",
+      badge: "Deterministic plan",
+      file: "src/focus_warden/scheduler.py",
+      summary:
+        "Creates the day schedule from tasks, session start, grace period, stretch cadence, gym offset, and shutdown deadline.",
+      signals: "grace window, stretch insertion, gym break, shutdown warning, hard shutdown.",
+      why:
+        "This is the pure boundary. It converts data into schedule items and leaves all side effects to the runtime.",
+    },
+    daemon: {
+      title: "daemon.py",
+      badge: "Legacy engine",
+      file: "src/focus_warden/daemon.py",
+      summary:
+        "Runs the manual Qt event loop, fetches tasks, creates the session, shows the blocker, logs to SQLite, and handles control commands.",
+      signals: "session start, tick loop, blocker activation, interruption logging.",
+      why:
+        "This module wires the whole runtime together: scheduling, UI, control plane, and persistence.",
+    },
+    ui: {
+      title: "ui.py",
+      badge: "Fullscreen blocker",
+      file: "src/focus_warden/ui.py",
+      summary:
+        "Displays a fullscreen blocker that gates task starts by typed title and break starts by button press.",
+      signals: "Escape blocking, confirm button gating, fullscreen close resistance.",
+      why:
+        "This is the UI layer that turns schedule items into explicit user interaction.",
+    },
+    control: {
+      title: "control_server.py",
+      badge: "IPC socket",
+      file: "src/focus_warden/control_server.py",
+      summary:
+        "Binds a Unix socket, accepts JSON commands, and hands them to the daemon command handler.",
+      signals: "pause, resume, give_up, status.",
+      why:
+        "It keeps control local and avoids a second process mutating daemon state directly.",
+    },
+    db: {
+      title: "db.py",
+      badge: "Daemon persistence",
+      file: "src/focus_warden/db.py",
+      summary:
+        "Defines the daemon SQLite schema for sessions, tasks, interruptions, and control events.",
+      signals: "sessions, tasks, interruptions, control_events.",
+      why:
+        "It gives the daemon an audit trail and makes control commands and timing measurable.",
+    },
+  };
+
+  const storyData = [
+    {
+      title: "Define the package",
+      body:
+        "The build starts in pyproject.toml, where the package metadata, dependencies, and console script are declared.",
+    },
+    {
+      title: "Load config",
+      body:
+        "config.py reads TOML, expands user paths, and maps each section into typed dataclasses for the runtime.",
+    },
+    {
+      title: "Create storage",
+      body:
+        "The store modules create their SQLite schemas, add missing columns, and migrate older JSON or session records.",
+    },
+    {
+      title: "Build the schedule",
+      body:
+        "scheduler.py converts tasks into ordered schedule items with a pure, testable function.",
+    },
+    {
+      title: "Wire the runtime",
+      body:
+        "daemon.py connects the Qt event loop, the blocker window, the state machine, the database, and the control server.",
+    },
+    {
+      title: "Expose IPC",
+      body:
+        "control_server.py accepts pause, resume, give_up, and status commands over a local Unix socket.",
+    },
+  ];
+
+  const stateCycle = [
+    0, 1, 2, 3, 4, 5, 6, 7
+  ];
+
+  function setView(name) {
+    views.forEach(view => view.classList.toggle("active", view.dataset.panel === name));
+    tabs.forEach(tab => tab.classList.toggle("active", tab.dataset.view === name));
+    try {
+      localStorage.setItem(viewStorageKey, name);
+    } catch (err) {
+      void err;
+    }
+  }
+
+  function safeGetStoredView() {
+    try {
+      return localStorage.getItem(viewStorageKey);
+    } catch (err) {
+      void err;
+      return null;
+    }
+  }
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, ch => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[ch]);
+  }
+
+  function setStory(index) {
+    const item = storyData[index];
+    document.getElementById("story-title").textContent = item.title;
+    document.getElementById("story-body").textContent = item.body;
+    document.getElementById("story-index").textContent = `${index + 1} / ${storyData.length}`;
+    storySteps.forEach(step => step.classList.toggle("active", Number(step.dataset.step) === index));
+  }
+
+  function setInspector(key) {
+    const data = nodeData[key];
+    document.getElementById("inspector-title").textContent = data.title;
+    document.getElementById("inspector-badge").textContent = data.badge;
+    document.getElementById("inspector-file").textContent = data.file;
+    document.getElementById("inspector-summary").textContent = data.summary;
+    document.getElementById("inspector-signals").textContent = data.signals;
+    const list = document.querySelector("#inspector .detail-list");
+    list.innerHTML = `
+      <div class="row">
+        <strong>Why it matters</strong>
+        ${escapeHtml(data.why)}
+      </div>
+      <div class="row">
+        <strong>File</strong>
+        <code>${escapeHtml(data.file)}</code>
+      </div>
+      <div class="row">
+        <strong>Signals to watch</strong>
+        <span>${escapeHtml(data.signals)}</span>
+      </div>
+    `;
+    nodes.forEach(node => node.classList.toggle("active", node.dataset.node === key));
+  }
+
+  function setState(index) {
+    stateCards.forEach((card, i) => card.classList.toggle("active", i === index));
+  }
+
+  function animateCounts() {
+    metrics.forEach(metric => {
+      const target = Number(metric.dataset.count);
+      const el = metric;
+      const duration = 1000;
+      const start = performance.now();
+      function tick(now) {
+        const progress = Math.min((now - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        el.textContent = String(Math.round(target * eased));
+        if (progress < 1) {
+          requestAnimationFrame(tick);
+        }
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => setView(tab.dataset.view));
+  });
+
+  nodes.forEach(node => {
+    node.addEventListener("click", () => setInspector(node.dataset.node));
+  });
+
+  const savedView = safeGetStoredView();
+  if (savedView && document.querySelector(`.tab[data-view="${savedView}"]`)) {
+    setView(savedView);
+  }
+
+  setInspector("main");
+  setStory(0);
+  setState(0);
+  animateCounts();
+
+  let storyIndex = 0;
+  let stateIndex = 0;
+  let nodeIndex = 0;
+  const uniqueNodeKeys = [...new Set(nodes.map(node => node.dataset.node))];
+
+  window.setInterval(() => {
+    storyIndex = (storyIndex + 1) % storyData.length;
+    setStory(storyIndex);
+  }, 3200);
+
+  window.setInterval(() => {
+    stateIndex = (stateIndex + 1) % stateCycle.length;
+    setState(stateIndex);
+  }, 2200);
+
+  window.setInterval(() => {
+    nodeIndex = (nodeIndex + 1) % uniqueNodeKeys.length;
+    setInspector(uniqueNodeKeys[nodeIndex]);
+  }, 4200);
+</script>
+</body>
+</html>

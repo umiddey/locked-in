@@ -1,0 +1,15 @@
+.env
+config.toml
+*.db
+*.sqlite
+*.sqlite3
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+.agents/
+.claude/
+.codex/
+.DS_Store

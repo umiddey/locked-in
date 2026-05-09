@@ -1,0 +1,12 @@
+[Unit]
+Description=Focus Warden Web Dashboard
+
+[Service]
+Type=simple
+# Adjust the path below to your install location
+ExecStart=%h/.local/bin/focus-warden web --port 8765
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,17 @@
+[Unit]
+Description=Open Focus Warden dashboard in browser on login
+After=focus-warden-web.service graphical-session.target
+Requires=focus-warden-web.service
+Wants=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 4
+ExecStart=/bin/sh -c 'exec xdg-open http://localhost:8765'
+RemainAfterExit=yes
+Environment=DISPLAY=:1
+Environment=WAYLAND_DISPLAY=wayland-1
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+
+[Install]
+WantedBy=default.target

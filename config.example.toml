@@ -1,0 +1,44 @@
+[schedule]
+default_task_minutes = 30
+gym_offset_hours = 5.5
+gym_duration_minutes = 40
+stretch_interval_minutes = 60
+stretch_duration_minutes = 5
+hard_shutdown_time = "01:00"
+shutdown_warning_minutes = 10
+hard_shutdown_enabled = true
+
+[warden]
+task_start_grace_seconds = 300
+allow_break_skip = false
+give_up_cooldown_seconds = 30
+give_up_requires_phrase = "I AM GIVING UP TODAY"
+
+[control]
+socket_path = "~/.local/state/focus-warden/control.sock"
+
+[ui]
+theme = "black"
+show_clock = true
+show_blocker_window = false
+
+[web]
+port = 8765
+open_browser_on_startup = false
+
+[auto_pause]
+enabled = true
+mic_active_seconds = 15
+resume_after_silence_seconds = 180
+poll_seconds = 5
+# Empty means any app using the microphone counts.
+call_apps = []
+# Ignore local dictation tools so talking to the computer does not pause focus mode.
+ignored_apps = ["PipeWire ALSA [python", "python3.14", "voice_continuous.py"]
+# Idle auto-pause: pause task after N seconds of no keyboard/mouse activity
+idle_pause_seconds = 60
+# Auto-resume when activity detected within N seconds of returning
+idle_resume_grace_seconds = 3
+
+[keys]
+baby_hotkey = "F12"

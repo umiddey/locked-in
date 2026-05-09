@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "focus-warden"
+version = "0.1.0"
+description = "Linux desktop focus enforcer — scheduled tasks, enforced breaks, and hard shutdowns"
+requires-python = ">=3.11"
+license = "MIT"
+dependencies = [
+    "PyQt6>=6.5.0",
+    "tomli>=2.0.0;python_version<'3.11'",
+]
+
+[project.optional-dependencies]
+notion = ["notion-client>=2.0.0"]
+
+[project.scripts]
+focus-warden = "focus_warden.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/focus_warden"]
