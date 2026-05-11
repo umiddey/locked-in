@@ -8,7 +8,7 @@ from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import QApplication, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
 
-from .models import ScheduleItem, ScheduleKind, State
+from .models import ScheduleItem, State
 
 log = logging.getLogger(__name__)
 
@@ -22,7 +22,21 @@ class BlockerWindow(QWidget):
         self.on_give_up = on_give_up
         self._confirmed = False
         self._closing_allowed = False
+        self._ready_to_confirm = False
         self._setup_ui()
+        # Add 1.5s delay before allowing confirmation to prevent accidental triggers (e.g. VTT key release)
+        QTimer.singleShot(1500, self._allow_confirmation)
+
+    def _allow_confirmation(self):
+        self._ready_to_confirm = True
+        self._update_confirm_button_state()
+
+    def _update_confirm_button_state(self):
+        if not hasattr(self, "_item") or not self._item:
+            return
+        typed = self.input.text().strip().lower()
+        expected = self._item.title.strip().lower()
+        self.confirm_btn.setEnabled(self._ready_to_confirm and typed == expected)
 
     def _setup_ui(self):
         self.setWindowFlags(
@@ -86,23 +100,12 @@ class BlockerWindow(QWidget):
         self._item = item
         self.title_label.setText(item.title)
         self.duration_label.setText(f"{item.duration_minutes} min")
-        if item.kind == ScheduleKind.TASK:
-            self.input.setPlaceholderText(f"Type: {item.title}")
-            self.input.show()
-            self.confirm_btn.show()
-        else:
-            self.input.hide()
-            self.confirm_btn.setText("Start Break")
-            self.confirm_btn.setEnabled(True)
-            self.confirm_btn.show()
+        self.input.setPlaceholderText(f"Type: {item.title}")
+        self.input.show()
+        self.confirm_btn.show()
 
     def _on_text(self, text: str):
-        if not hasattr(self, "_item") or not self._item:
-            return
-        if self._item.kind == ScheduleKind.TASK:
-            typed = text.strip().lower()
-            expected = self._item.title.strip().lower()
-            self.confirm_btn.setEnabled(typed == expected)
+        self._update_confirm_button_state()
 
     def _confirm(self):
         if self._confirmed:

@@ -21,7 +21,6 @@ class TaskStatus(str, enum.Enum):
 
 class ScheduleKind(str, enum.Enum):
     TASK = "task"
-    STRETCH = "stretch"
     SHUTDOWN_WARNING = "shutdown_warning"
     SHUTDOWN = "shutdown"
 
@@ -30,8 +29,6 @@ class State(str, enum.Enum):
     IDLE = "idle"
     AWAITING_TASK_START = "awaiting_task_start"
     TASK_ACTIVE = "task_active"
-    AWAITING_BREAK_START = "awaiting_break_start"
-    BREAK_ACTIVE = "break_active"
     PAUSED = "paused"
     GIVEN_UP = "given_up"
     FINISHED = "finished"

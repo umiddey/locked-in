@@ -1,0 +1,146 @@
+<div class="section">
+    <div class="section__title">Hardware Calibration</div>
+    <div id="cal-ui">
+        <p class="field__hint" style="margin-bottom:12px">Tired of accidental pauses? Let Locked-In learn your specific keyboard and mouse sensitivity.</p>
+        
+        <div style="margin-bottom:16px; padding:12px; background:var(--s2); border-radius:var(--r); border:1px solid var(--b1)">
+            <div style="font-family:var(--mono); font-size:10px; color:var(--dim); text-transform:uppercase; margin-bottom:8px">Current Thresholds</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; font-family:var(--mono); font-size:12px">
+                <span style="color:var(--dim)">Device</span><span style="color:var(--dim)">Soft</span><span style="color:var(--dim)">Hard</span>
+                
+                <span style="color:var(--txh)">Keyboard (i8042)</span>
+                <span style="color:var(--grnh)">{{ config.auto_pause.soft_threshold_i8042|default(1) }}</span>
+                <span style="color:var(--amb)">{{ config.auto_pause.hard_threshold_i8042|default(3) }}</span>
+                
+                <span style="color:var(--txh)">USB/Mouse (xhci_hcd)</span>
+                <span style="color:var(--grnh)">{{ config.auto_pause.soft_threshold_xhci_hcd|default(1) }}</span>
+                <span style="color:var(--amb)">{{ config.auto_pause.hard_threshold_xhci_hcd|default(10) }}</span>
+            </div>
+        </div>
+
+        <button type="button" class="btn btn--primary" id="btn-start-cal">Learn My Hardware</button>
+    </div>
+    
+    <div id="cal-modal" style="display:none; margin-top:16px; padding:16px; background:var(--s2); border-radius:var(--r); border:1px solid var(--ambb)">
+        <h3 id="cal-title" style="font-size:16px; margin-bottom:8px">Step 1: Baseline</h3>
+        <p id="cal-desc" style="font-size:13px; color:var(--tx); margin-bottom:12px">Stay completely still! Don't touch the keyboard or mouse.</p>
+        
+        <div class="hero__prog" style="height:8px; margin-bottom:12px">
+            <div id="cal-progress" class="hero__prog-fill" style="width:0%"></div>
+        </div>
+        
+        <div id="cal-timer" style="font-family:var(--mono); font-size:24px; font-weight:800; text-align:center; color:var(--amb)">30</div>
+    </div>
+
+    <div id="cal-results" style="display:none; margin-top:16px">
+        <div class="panel">
+            <div class="panel__head"><span class="panel__title">New Thresholds</span></div>
+            <div id="cal-table" style="padding:12px 16px; font-family:var(--mono); font-size:12px">
+                <!-- Results injected here -->
+            </div>
+        </div>
+        <button type="button" class="btn btn--primary" id="btn-apply-cal">Apply & Restart</button>
+    </div>
+</div>
+
+<script>
+(() => {
+    let idleData = null;
+    let activeData = null;
+    const duration = 30;
+
+    const btnStart = document.getElementById('btn-start-cal');
+    const modal = document.getElementById('cal-modal');
+    const results = document.getElementById('cal-results');
+    const timer = document.getElementById('cal-timer');
+    const progress = document.getElementById('cal-progress');
+    const title = document.getElementById('cal-title');
+    const desc = document.getElementById('cal-desc');
+
+    const runStage = async (stage) => {
+        title.textContent = stage === 'idle' ? 'Step 1: Baseline' : 'Step 2: Activity';
+        desc.textContent = stage === 'idle' ? 'STAY STILL! Don\'t touch anything for 30 seconds.' : 'MOVE! Type and move your mouse actively for 30 seconds.';
+        
+        let remaining = duration;
+        const interval = setInterval(() => {
+            remaining--;
+            timer.textContent = remaining;
+            progress.style.width = ((duration - remaining) / duration * 100) + '%';
+            if (remaining <= 0) clearInterval(interval);
+        }, 1000);
+
+        const resp = await fetch('/calibrate', {
+            method: 'POST',
+            body: new URLSearchParams({ stage, duration })
+        });
+        return await resp.json();
+    };
+
+    btnStart.addEventListener('click', async () => {
+        btnStart.style.display = 'none';
+        modal.style.display = 'block';
+
+        // 3-second countdown — hands off!
+        title.textContent = 'Get Ready';
+        desc.textContent = 'Take your hands off the keyboard and mouse NOW.';
+        let countdown = 3;
+        timer.textContent = countdown;
+        progress.style.width = '0%';
+        await new Promise(r => {
+            const iv = setInterval(() => {
+                countdown--;
+                timer.textContent = countdown;
+                progress.style.width = ((3 - countdown) / 3 * 100) + '%';
+                if (countdown <= 0) { clearInterval(iv); r(); }
+            }, 1000);
+        });
+
+        // Stage 1: Idle
+        idleData = await runStage('idle');
+        
+        // Brief pause
+        timer.textContent = '...';
+        await new Promise(r => setTimeout(r, 2000));
+        
+        // Stage 2: Active
+        activeData = await runStage('active');
+        
+        modal.style.display = 'none';
+        showResults();
+    });
+
+    const showResults = () => {
+        results.style.display = 'block';
+        const table = document.getElementById('cal-table');
+        const soft = {}, hard = {};
+        
+        let html = '<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; border-bottom:1px solid var(--b1); padding-bottom:4px; margin-bottom:8px; color:var(--dim)"><span>Device</span><span>Soft</span><span>Hard</span></div>';
+        
+        for (const [name, noise] of Object.entries(idleData.noise)) {
+            const signal = activeData.signal[name] || 0;
+            soft[name] = noise + 1;
+            hard[name] = Math.max(soft[name] + 1, Math.floor(signal * 0.5));
+            
+            html += `<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:4px">
+                <span style="color:var(--txh)">${name}</span>
+                <span style="color:var(--grnh)">${soft[name]}</span>
+                <span style="color:var(--amb)">${hard[name]}</span>
+            </div>`;
+        }
+        table.innerHTML = html;
+        
+        document.getElementById('btn-apply-cal').onclick = async () => {
+            const resp = await fetch('/calibrate/apply', {
+                method: 'POST',
+                body: new URLSearchParams({ 
+                    soft: JSON.stringify(soft), 
+                    hard: JSON.stringify(hard) 
+                })
+            });
+            if ((await resp.json()).status === 'success') {
+                location.reload();
+            }
+        };
+    };
+})();
+</script>

@@ -2,22 +2,6 @@
 
 {% block title %}Dashboard — Locked-In{% endblock %}
 
-{% block nav_right %}
-    <span class="clock" id="clock"></span>
-    <span class="dot {{ 'dot--on' if daemon_online else 'dot--off' }}"></span>
-    <form method="get" action="/">
-        <input type="hidden" name="date" value="{{ target_date_iso }}" />
-        {% if historical_view %}<input type="hidden" name="view" value="historical" />{% endif %}
-        <button class="nav__btn" type="submit">&#8635;</button>
-    </form>
-    {% if not historical_view %}
-    <a href="/history" class="nav__btn">History</a>
-    {% else %}
-    <a href="/" class="nav__btn nav__btn--accent">Today</a>
-    {% endif %}
-    <a href="/settings" class="nav__btn">&#9881; Settings</a>
-{% endblock %}
-
 {% block banner %}
     {% if message %}
     <div class="ban {{ 'ban--err' if is_error else '' }} {{ 'ban--info' if historical_view else '' }}">
@@ -33,38 +17,68 @@
 {% endblock %}
 
 {% block content %}
-    <div id="hero-section">
-        {% include "components/hero.html" %}
+    <div class="dash-layout" id="dash-layout">
+        <div class="dash-main">
+            <div id="schedule-section">
+                {% include "components/schedule.html" %}
+            </div>
+
+            <div id="metrics-section">
+                {% include "components/metrics.html" %}
+            </div>
+
+            <div id="task-metrics-section">
+                {% include "components/task_metrics.html" %}
+            </div>
+        </div>
     </div>
 
-    <div id="actions-section">
-        {% include "components/actions.html" %}
+    <div id="side-panel" class="side-panel">
+        <!-- Loaded via JS -->
     </div>
 
-    <div id="schedule-section">
-        {% include "components/schedule.html" %}
-    </div>
-
-    <div id="metrics-section">
-        {% include "components/metrics.html" %}
-    </div>
-
-    <div id="task-metrics-section">
-        {% include "components/task_metrics.html" %}
-    </div>
-
-    <div id="planner-section">
-        {% include "components/planner.html" %}
+    <div id="pro-modal" class="modal-overlay" onclick="if(event.target===this)toggleProMode()">
+        <div class="modal">
+            <div class="modal__head">
+                <span class="modal__title">Pro Mode — Bulk Editor</span>
+                <button class="side-panel__close" onclick="toggleProMode()">&times;</button>
+            </div>
+            <div class="modal__body">
+                <form method="post" action="/plan">
+                    <div style="margin-bottom:15px">
+                        {% if not historical_view %}
+                        <span class="plan__date-val">{{ target_date_display }}</span>
+                        <input type="hidden" name="date" value="{{ target_date_iso }}" />
+                        {% else %}
+                        <input type="date" name="date" value="{{ target_date_iso }}" class="plan__date-input" />
+                        <input type="hidden" name="view" value="historical" />
+                        {% endif %}
+                    </div>
+                    
+                    <div id="task-editor" class="task-editor">
+                        {{ editor_rows_html|safe }}
+                    </div>
+                    <button class="btn btn--ghost" type="button" id="add-task-row" style="margin-top:10px">+ Add Row</button>
+                    <template id="task-row-template">{{ editor_template_html|safe }}</template>
+                    
+                    <details class="raw-import" style="margin-top:15px">
+                        <summary style="font-family:var(--mono);font-size:10px;color:var(--dim);cursor:pointer">Raw text import</summary>
+                        <textarea name="tasks" spellcheck="false" placeholder="Task name - 30" style="min-height:200px">{{ tasks_text }}</textarea>
+                    </details>
+                    
+                    <div style="display:flex;gap:10px;margin-top:20px">
+                        <button class="btn btn--primary" type="submit">Save Plan</button>
+                        <button class="btn" type="button" onclick="toggleProMode()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 {% endblock %}
 
 {% block footer %}
     <div class="foot__l">
-        <form method="post" action="/day/reset" onsubmit="return confirm('Reset entire day?')">
-            <input type="hidden" name="date" value="{{ target_date_iso }}" />
-            {% if historical_view %}<input type="hidden" name="view" value="historical" />{% endif %}
-            <button class="btn btn--red" type="submit">Reset Day</button>
-        </form>
+        <button class="btn" onclick="toggleProMode()">Pro Mode</button>
     </div>
     <div class="foot__r">
         <span style="font-family:var(--mono);font-size:10px;color:var(--dim)">{{ target_date_iso }}</span>
@@ -73,13 +87,20 @@
 
 {% block extra_js %}
     const e=document.getElementById("task-editor"),tpl=document.getElementById("task-row-template"),ab=document.getElementById("add-task-row");
-    if(e&&tpl&&ab)ab.addEventListener("click",()=>{const i=e.querySelectorAll(".task-row").length,w=document.createElement("div");w.innerHTML=tpl.innerHTML.replaceAll("__INDEX__",String(i)).replaceAll("__DISPLAY__",String(i+1)).trim();const r=w.firstElementChild;if(!r)return;e.appendChild(r);const n=r.querySelector(`input[name="task_name_${i}"]`);if(n)n.focus()});
+    if(e&&tpl&&ab)ab.addEventListener("click",()=>{
+        const i=e.querySelectorAll(".task-row").length,w=document.createElement("div");
+        w.innerHTML=tpl.innerHTML.replaceAll("__INDEX__",String(i)).replaceAll("__DISPLAY__",String(i+1)).trim();
+        const r=w.firstElementChild;if(!r)return;e.appendChild(r);
+        const n=r.querySelector(`input[name="task_name_${i}"]`);if(n)n.focus()
+    });
 
     const wt=document.getElementById("work-timer");
-    if(wt){const s=new Date(wt.dataset.started).getTime(),pa=parseInt(wt.dataset.pauseAcc||"0")*1000;
-    setInterval(()=>{const d=Date.now()-s-pa;const m=Math.max(0,Math.floor(d/60000));wt.textContent=m+"m"},5000)}
+    if(wt){
+        const s=new Date(wt.dataset.started).getTime(),pa=parseInt(wt.dataset.pauseAcc||"0")*1000;
+        setInterval(()=>{const d=Date.now()-s-pa;const m=Math.max(0,Math.floor(d/60000));wt.textContent=m+"m"},5000)
+    }
 
-    // Fragment interchange
+    // Fragment interchange: intercept forms with data-fragment
     document.addEventListener('submit', async (e) => {
         const form = e.target;
         if (!form.dataset.fragment) return;
@@ -91,10 +112,76 @@
             const fragments = await resp.json();
             for (const [id, html] of Object.entries(fragments)) {
                 const el = document.getElementById(id + '-section');
-                if (el) el.outerHTML = html;
+                if (el) {
+                    el.innerHTML = html;
+                    // Re-run timer logic if hero/schedule was updated
+                    if (id === 'schedule') {
+                        const newWt = el.querySelector('#work-timer');
+                        if (newWt) {
+                            const s=new Date(newWt.dataset.started).getTime(),pa=parseInt(newWt.dataset.pauseAcc||"0")*1000;
+                            setInterval(()=>{const d=Date.now()-s-pa;const m=Math.max(0,Math.floor(d/60000));newWt.textContent=m+"m"},5000)
+                        }
+                    }
+                }
             }
         } catch (err) {
             console.error('Fragment update failed:', err);
         }
     });
+
+    window.openTaskDetail = async function(id) {
+        const panel = document.getElementById('side-panel');
+        const layout = document.getElementById('dash-layout');
+        panel.innerHTML = '<div class="empty">Loading...</div>';
+        panel.classList.add('side-panel--open');
+        layout.classList.add('dash-layout--sidecar');
+        try {
+            const resp = await fetch('/fragments/task-detail/' + id);
+            panel.innerHTML = await resp.text();
+            // Re-run scripts in fragment
+            panel.querySelectorAll('script').forEach(oldScript => {
+                const newScript = document.createElement('script');
+                newScript.textContent = oldScript.textContent;
+                oldScript.parentNode.replaceChild(newScript, oldScript);
+            });
+        } catch (err) {
+            panel.innerHTML = '<div class="ban ban--err">Failed to load details</div>';
+        }
+    };
+
+    window.closeTaskDetail = function() {
+        document.getElementById('side-panel').classList.remove('side-panel--open');
+        document.getElementById('dash-layout').classList.remove('dash-layout--sidecar');
+    };
+
+    window.toggleProMode = function() {
+        document.getElementById('pro-modal').classList.toggle('modal-overlay--open');
+    };
+
+    // Inline edit for pending schedule tasks
+    window.scEdit = function(btn, taskId, name, dur, dateIso) {
+        const row = btn.closest('.sc');
+        const body = row.querySelector('.sc__body');
+        const est = row.querySelector('.sc__est');
+        const acts = row.querySelector('.sc__act');
+        est.innerHTML = '<form class="sc__edit-form" data-fragment method="post" action="/task/edit">' +
+            '<input type="hidden" name="date" value="' + dateIso + '"/>' +
+            '<input type="hidden" name="task_id" value="' + taskId + '"/>' +
+            '<input type="text" name="task_name" value="' + name.replace(/"/g,'&quot;') + '"/>' +
+            '<input type="number" name="duration_minutes" min="1" value="' + dur + '"/>' +
+            '<button type="submit" title="Save">&#10003;</button>' +
+            '<button type="button" class="sc__ecancel" title="Cancel" onclick="scEditCancel(this)">&#10005;</button>' +
+            '</form>';
+        body.style.display = 'none';
+        if (acts) acts.style.display = 'none';
+        est.querySelector('input[type=text]').focus();
+    };
+    window.scEditCancel = function(btn) {
+        const schedSec = document.getElementById('schedule-section');
+        if (schedSec) {
+            fetch('/fragments/dashboard?date=' + (new URLSearchParams(window.location.search).get('date') || '')).then(r=>r.json()).then(f=>{
+                if (f.schedule) schedSec.innerHTML = f.schedule;
+            });
+        }
+    };
 {% endblock %}

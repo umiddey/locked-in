@@ -23,6 +23,7 @@ class StretchLockout:
         self._locked = False
         self._paused = False
         self._lock_until: datetime | None = None
+        self._lock_proc: subprocess.Popen | None = None
 
     def start(self):
         """Mark that work is happening. Does NOT reset accumulation."""
@@ -40,6 +41,7 @@ class StretchLockout:
         self._paused = False
         self._work_accumulated = 0.0
         self._lock_until = None
+        self._lock_proc = None
 
     def pause(self):
         self._paused = True
@@ -60,13 +62,23 @@ class StretchLockout:
             return
 
         if self._locked:
+            # Primary: detect hyprlock exit (user typed password)
+            if self._lock_proc and self._lock_proc.poll() is not None:
+                log.info("Hyprlock exited (user unlocked), stretch break over")
+                self._locked = False
+                self._lock_until = None
+                self._lock_proc = None
+                self._work_accumulated = 0.0
+                return
+            # Fallback: timer-based in case process tracking fails
             now = datetime.now()
             if self._lock_until and now >= self._lock_until:
                 self._unlock()
                 self._locked = False
                 self._lock_until = None
+                self._lock_proc = None
                 self._work_accumulated = 0.0
-                log.info("Stretch break over. Resuming work.")
+                log.info("Stretch break over (timer expired). Resuming work.")
             return
 
         self._work_accumulated += 1.0
@@ -80,13 +92,14 @@ class StretchLockout:
 
     def _lock(self):
         try:
-            subprocess.Popen(
+            self._lock_proc = subprocess.Popen(
                 ["hyprlock"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
         except FileNotFoundError:
             log.warning("hyprlock not found, cannot lock screen")
+            self._lock_proc = None
 
     def _unlock(self):
         try:

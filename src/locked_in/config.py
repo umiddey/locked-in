@@ -24,11 +24,14 @@ ENV_SEARCH_PATHS = [
 ENV_FIELD_MAP = {
     "schedule": {
         "default_task_minutes": ("SCHEDULE_DEFAULT_TASK_MINUTES",),
-        "stretch_interval_minutes": ("SCHEDULE_STRETCH_INTERVAL_MINUTES",),
-        "stretch_duration_minutes": ("SCHEDULE_STRETCH_DURATION_MINUTES",),
         "hard_shutdown_time": ("SCHEDULE_HARD_SHUTDOWN_TIME",),
         "shutdown_warning_minutes": ("SCHEDULE_SHUTDOWN_WARNING_MINUTES",),
         "hard_shutdown_enabled": ("SCHEDULE_HARD_SHUTDOWN_ENABLED",),
+    },
+    "stretch_lockout": {
+        "enabled": ("STRETCH_LOCKOUT_ENABLED",),
+        "interval_minutes": ("STRETCH_LOCKOUT_INTERVAL_MINUTES",),
+        "duration_minutes": ("STRETCH_LOCKOUT_DURATION_MINUTES",),
     },
     "warden": {
         "task_start_grace_seconds": ("WARDEN_TASK_START_GRACE_SECONDS",),
@@ -65,11 +68,16 @@ ENV_FIELD_MAP = {
 @dataclass
 class ScheduleConfig:
     default_task_minutes: int = 30
-    stretch_interval_minutes: int = 60
-    stretch_duration_minutes: int = 5
     hard_shutdown_time: str = "01:00"
     shutdown_warning_minutes: int = 10
     hard_shutdown_enabled: bool = True
+
+
+@dataclass
+class StretchLockoutConfig:
+    enabled: bool = False
+    interval_minutes: int = 60
+    duration_minutes: int = 5
 
 
 @dataclass
@@ -109,16 +117,28 @@ class AutoPauseConfig:
     ignored_apps: list[str] = field(default_factory=list)
     idle_pause_seconds: int = 60
     idle_resume_grace_seconds: int = 3
+    soft_threshold_i8042: int = 1
+    soft_threshold_xhci_hcd: int = 1
+    hard_threshold_i8042: int = 3
+    hard_threshold_xhci_hcd: int = 10
+
+
+@dataclass
+class BackupConfig:
+    enabled: bool = False
+    path: str = ""
 
 
 @dataclass
 class Config:
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
+    stretch_lockout: StretchLockoutConfig = field(default_factory=StretchLockoutConfig)
     warden: WardenConfig = field(default_factory=WardenConfig)
     control: ControlConfig = field(default_factory=ControlConfig)
     ui: UIConfig = field(default_factory=UIConfig)
     web: WebConfig = field(default_factory=WebConfig)
     auto_pause: AutoPauseConfig = field(default_factory=AutoPauseConfig)
+    backup: BackupConfig = field(default_factory=BackupConfig)
 
 
 def _expand_path(p: str) -> str:
@@ -238,6 +258,8 @@ def load_config(path: str | None = None) -> Config:
     cfg = Config()
     if "schedule" in data:
         cfg.schedule = _dict_to_dataclass(ScheduleConfig, data["schedule"])
+    if "stretch_lockout" in data:
+        cfg.stretch_lockout = _dict_to_dataclass(StretchLockoutConfig, data["stretch_lockout"])
     if "warden" in data:
         cfg.warden = _dict_to_dataclass(WardenConfig, data["warden"])
     if "control" in data:
@@ -248,7 +270,11 @@ def load_config(path: str | None = None) -> Config:
         cfg.web = _dict_to_dataclass(WebConfig, data["web"])
     if "auto_pause" in data:
         cfg.auto_pause = _dict_to_dataclass(AutoPauseConfig, data["auto_pause"])
+    if "backup" in data:
+        cfg.backup = _dict_to_dataclass(BackupConfig, data["backup"])
 
     _apply_env_overrides(cfg, env_values)
     cfg.control.socket_path = _expand_path(cfg.control.socket_path)
+    if cfg.backup.path:
+        cfg.backup.path = _expand_path(cfg.backup.path)
     return cfg

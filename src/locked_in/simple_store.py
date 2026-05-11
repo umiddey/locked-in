@@ -541,7 +541,7 @@ class SimpleTodoStore:
             self.conn.commit()
             return cur.rowcount > 0
 
-    def update_task(self, target_date: date, task_id: int, task_name: str | None = None, duration_minutes: int | None = None, description: str | None = None) -> bool:
+    def update_task(self, target_date: date, task_id: int, task_name: str | None = None, duration_minutes: int | None = None, description: str | None = None, position: int | None = None) -> bool:
         with self._lock:
             parts: list[str] = []
             vals: list = []
@@ -554,6 +554,9 @@ class SimpleTodoStore:
             if description is not None:
                 parts.append("description = ?")
                 vals.append(description.strip() or None)
+            if position is not None:
+                parts.append("position = ?")
+                vals.append(int(position))
             if not parts:
                 return False
             vals.extend([task_id, target_date.isoformat()])
@@ -563,6 +566,30 @@ class SimpleTodoStore:
             )
             self.conn.commit()
             return cur.rowcount > 0
+
+    def move_task(self, target_date: date, task_id: int, direction: int) -> bool:
+        """Move a task up (-1) or down (+1) in position. Swaps with neighbor."""
+        with self._lock:
+            target = target_date.isoformat()
+            rows = self.conn.execute(
+                "SELECT id, position FROM plan_tasks WHERE target_date = ? ORDER BY position ASC, id ASC",
+                (target,),
+            ).fetchall()
+            if not rows:
+                return False
+            idx = next((i for i, r in enumerate(rows) if r["id"] == task_id), None)
+            if idx is None:
+                return False
+            new_idx = idx + direction
+            if new_idx < 0 or new_idx >= len(rows):
+                return False
+            swap_id = rows[new_idx]["id"]
+            cur_pos = rows[idx]["position"]
+            swap_pos = rows[new_idx]["position"]
+            self.conn.execute("UPDATE plan_tasks SET position = ? WHERE id = ?", (swap_pos, task_id))
+            self.conn.execute("UPDATE plan_tasks SET position = ? WHERE id = ?", (cur_pos, swap_id))
+            self.conn.commit()
+            return True
 
     def ensure_session(self, target_date: date, started_at: datetime | None = None) -> datetime:
         with self._lock:
@@ -1872,3 +1899,17 @@ class SimpleTodoStore:
                     row["id"],
                 ),
             )
+
+    def backup_to(self, dest_path: str) -> str:
+        """Back up the SQLite database to dest_path using SQLite online backup API."""
+        dest = Path(dest_path).expanduser()
+        dest.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_file = dest / f"locked-in_{timestamp}.db"
+        import sqlite3 as _sqlite3
+        dst_conn = _sqlite3.connect(str(backup_file))
+        try:
+            self.conn.backup(dst_conn)
+        finally:
+            dst_conn.close()
+        return str(backup_file)

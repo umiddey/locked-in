@@ -116,6 +116,102 @@ class HistoricalPlannerViewTests(unittest.TestCase):
         self.assertIn('input type="date" name="date"', html)
         self.assertIn("Historical view", html)
 
+    def test_first_pending_task_gets_start_button_on_full_page(self) -> None:
+        self.frontend._status_payload = lambda target_date: {
+            "daemon": {
+                "session_id": None,
+                "state": "idle",
+                "current_item": None,
+                "next_item": None,
+                "bootstrap_error": None,
+                "next_bootstrap_retry_at": None,
+            },
+            "plan": {
+                "plan_exists": True,
+                "saved_at": "2026-05-06T09:00:00",
+                "session_started_at": "2026-05-06T09:00:00",
+                "task_count": 2,
+                "completed_count": 0,
+                "task_runtime": None,
+                "tasks": [
+                    {
+                        "id": 1,
+                        "position": 0,
+                        "task_name": "First pending",
+                        "duration_minutes": 30,
+                        "completed_at": None,
+                        "last_outcome": None,
+                        "description": None,
+                    },
+                    {
+                        "id": 2,
+                        "position": 1,
+                        "task_name": "Second pending",
+                        "duration_minutes": 20,
+                        "completed_at": None,
+                        "last_outcome": None,
+                        "description": None,
+                    },
+                ],
+                "schedule": [
+                    {
+                        "task_id": 1,
+                        "task_name": "First pending",
+                        "status": "pending",
+                        "projected_start": "2026-05-11T09:00:00",
+                        "projected_end": "2026-05-11T09:30:00",
+                        "actual_start": None,
+                        "actual_end": None,
+                        "eta": None,
+                        "duration_minutes": 30,
+                        "actual_work_seconds": 0,
+                        "pause_seconds": 0,
+                    },
+                    {
+                        "task_id": 2,
+                        "task_name": "Second pending",
+                        "status": "pending",
+                        "projected_start": "2026-05-11T09:30:00",
+                        "projected_end": "2026-05-11T09:50:00",
+                        "actual_start": None,
+                        "actual_end": None,
+                        "eta": None,
+                        "duration_minutes": 20,
+                        "actual_work_seconds": 0,
+                        "pause_seconds": 0,
+                    },
+                ],
+                "current_entry": {
+                    "task_id": 1,
+                    "task_name": "First pending",
+                    "status": "pending",
+                    "projected_start": "2026-05-11T09:00:00",
+                    "projected_end": "2026-05-11T09:30:00",
+                    "actual_start": None,
+                    "eta": None,
+                    "duration_minutes": 30,
+                },
+                "next_entry": {
+                    "task_id": 2,
+                    "task_name": "Second pending",
+                    "status": "pending",
+                    "projected_start": "2026-05-11T09:30:00",
+                    "projected_end": "2026-05-11T09:50:00",
+                    "actual_start": None,
+                    "eta": None,
+                    "duration_minutes": 20,
+                },
+                "recent_runs": [],
+            },
+            "target_date": target_date.isoformat(),
+        }
+
+        html = self.frontend._render_page(self.today, "", historical_view=False)
+
+        self.assertEqual(html.count('action="/run/start-current"'), 1)
+        self.assertLess(html.index("First pending"), html.index('action="/run/start-current"'))
+        self.assertLess(html.index('action="/run/start-current"'), html.index("Second pending"))
+
 
 if __name__ == "__main__":
     unittest.main()

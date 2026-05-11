@@ -1,36 +1,119 @@
 <div class="panel">
     <div class="panel__head">
-        <span class="panel__title">Schedule</span>
-        <span class="panel__badge">{{ schedule|length }}</span>
+        <span class="panel__title">Live Plan</span>
+        <span class="panel__badge">{{ schedule|length }} tasks</span>
     </div>
+    
     {% if not schedule %}
-    <div class="empty">No schedule. Save a plan first.</div>
-    {% else %}
-        {% for entry in schedule %}
-        <div class="sc {{ entry.cls }}">
-            <div class="sc__time">{{ entry.t0 }}<span class="sc__sep">&mdash;</span>{{ entry.t1 }}</div>
-            <div class="sc__body">
-                <div class="sc__name">
-                    {% if entry.task_id %}
-                    <a href="/task/{{ entry.task_id }}" class="sc__link">{{ entry.task_name }}</a>
-                    {% else %}
-                    {{ entry.task_name }}
-                    {% endif %}
-                    {% if entry.pause_tag %}<span class="tag tag--amber">{{ entry.pause_tag }}</span>{% endif %}
-                </div>
-                {% if entry.work_tag %}<span class="sc__work">{{ entry.work_tag }}</span>{% endif %}
-            </div>
-            <div class="sc__est">{{ entry.duration_minutes }}m</div>
-            {% if entry.task_id and entry.status == "pending" %}
-            <div class="sc__act">
-                <form method="post" action="/task/delete" onsubmit="return confirm('Delete this task?')">
-                    <input type="hidden" name="date" value="{{ target_date_iso }}" />
-                    <input type="hidden" name="task_id" value="{{ entry.task_id }}"/>
-                    <button class="sc__del" type="submit" title="Delete">&times;</button>
-                </form>
-            </div>
-            {% endif %}
+        <div class="empty">
+            <p>No tasks scheduled for today.</p>
+            <button class="btn btn--primary" style="margin-top:10px" onclick="toggleProMode()">Create a Plan</button>
         </div>
-        {% endfor %}
+    {% else %}
+        <div class="sc-list">
+            {% for entry in schedule %}
+                {% if entry.status in ["running", "paused"] %}
+                    {# INTEGRATED HERO/ACTIONS VIEW #}
+                    <div class="sc sc--active sc--active-hero" data-task-id="{{ entry.task_id }}">
+                        <div class="sc__main">
+                            <div class="sc__info">
+                                <div class="hero__top">
+                                    <span class="tag tag--{{ hero_cls.split('--')[1] }}">{{ hero_label }}</span>
+                                    <span class="hero__meta">{{ hero_meta|safe }}</span>
+                                </div>
+                                <div class="sc__name">
+                                    <a href="javascript:void(0)" onclick="openTaskDetail({{ entry.task_id }})" class="sc__link">{{ entry.task_name }}</a>
+                                </div>
+                            </div>
+                            <div class="sc__side">
+                                <div class="sc__time">{{ entry.t0 }} &mdash; {{ entry.t1 }}</div>
+                                <div class="sc__est">{{ entry.duration_minutes }}m</div>
+                            </div>
+                        </div>
+
+                        {% if hero_detail %}
+                        <div class="hero__detail {{ 'hero__detail--paused' if runtime_status == 'paused' }}">
+                            {{ hero_detail|safe }}
+                        </div>
+                        {% endif %}
+
+                        <div class="hero__bar">
+                            <div class="hero__prog"><div class="hero__prog-fill" style="width:{{ pct }}%"></div></div>
+                            <span class="hero__prog-label">{{ completed_str }}</span>
+                        </div>
+
+                        <div class="actions" style="margin-top:20px; margin-bottom:0">
+                            {% for action in actions %}
+                            <form method="post" action="{{ action.url }}" {% if action.fragment %}data-fragment{% endif %} class="{{ action.form_class }}">
+                                <input type="hidden" name="date" value="{{ target_date_iso }}" />
+                                {% if historical_view %}<input type="hidden" name="view" value="historical" />{% endif %}
+                                
+                                {% if action.notes %}
+                                <textarea name="notes" class="act-notes" placeholder="{{ action.notes_placeholder }}" rows="1" style="margin-bottom:5px"></textarea>
+                                {% endif %}
+                                
+                                <button class="act {{ action.btn_class }}" type="submit">
+                                    {{ action.label|safe }}
+                                </button>
+                            </form>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% else %}
+                    {# STANDARD ROW VIEW #}
+                    <div class="sc {{ entry.cls }}" data-task-id="{{ entry.task_id }}" data-status="{{ entry.status }}">
+                        <div class="sc__time">{{ entry.t0 }}<span class="sc__sep">&mdash;</span>{{ entry.t1 }}</div>
+                        <div class="sc__body">
+                            <div class="sc__name">
+                                {% if entry.task_id %}
+                                <a href="javascript:void(0)" onclick="openTaskDetail({{ entry.task_id }})" class="sc__link">{{ entry.task_name }}</a>
+                                {% else %}
+                                {{ entry.task_name }}
+                                {% endif %}
+                                {% if entry.pause_tag %}<span class="tag tag--amber">{{ entry.pause_tag }}</span>{% endif %}
+                            </div>
+                            {% if entry.work_tag %}<span class="sc__work">{{ entry.work_tag }}</span>{% endif %}
+                        </div>
+                        <div class="sc__est">{{ entry.duration_minutes }}m</div>
+                        
+                        {% if entry.task_id and entry.status == "pending" and not historical_view %}
+                        <div class="sc__act">
+                            {% if next_task and next_task.task_id == entry.task_id %}
+                            <form method="post" action="/run/start-current" data-fragment>
+                                <input type="hidden" name="date" value="{{ target_date_iso }}" />
+                                <button class="act act--start" type="submit" title="Start task">&#9654;</button>
+                            </form>
+                            {% endif %}
+                            <form method="post" action="/task/move" class="sc__mv" data-fragment>
+                                <input type="hidden" name="date" value="{{ target_date_iso }}" />
+                                <input type="hidden" name="task_id" value="{{ entry.task_id }}"/>
+                                <input type="hidden" name="direction" value="-1"/>
+                                <button class="sc__arr" type="submit" title="Move up">&uarr;</button>
+                            </form>
+                            <form method="post" action="/task/move" class="sc__mv" data-fragment>
+                                <input type="hidden" name="date" value="{{ target_date_iso }}" />
+                                <input type="hidden" name="task_id" value="{{ entry.task_id }}"/>
+                                <input type="hidden" name="direction" value="1"/>
+                                <button class="sc__arr" type="submit" title="Move down">&darr;</button>
+                            </form>
+                            <button class="sc__edit" type="button" title="Edit"
+                                onclick="scEdit(this, {{ entry.task_id }}, '{{ entry.task_name|e }}', {{ entry.duration_minutes }}, '{{ target_date_iso }}')">&#9998;</button>
+                            <form method="post" action="/task/delete" onsubmit="return confirm('Delete this task?')">
+                                <input type="hidden" name="date" value="{{ target_date_iso }}" />
+                                <input type="hidden" name="task_id" value="{{ entry.task_id }}"/>
+                                <button class="sc__del" type="submit" title="Delete">&times;</button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            {% endfor %}
+        </div>
+        
+        {% if not historical_view %}
+        <div style="padding:16px; border-top:1px solid var(--b1); display:flex; justify-content:center">
+            <button class="btn btn--ghost" onclick="toggleProMode()">+ Add Task</button>
+        </div>
+        {% endif %}
     {% endif %}
 </div>

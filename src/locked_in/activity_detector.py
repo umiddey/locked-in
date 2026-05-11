@@ -52,15 +52,20 @@ class MicActivityDetector:
         return MicActivitySnapshot(active=False, apps=[], error=error)
 
     def _matching_apps(self, apps: list[str]) -> list[str]:
+        """Return apps matching call_apps whitelist. Empty list = nothing matches (safe default).
+
+        Use call_apps = ["*"] to match any app (legacy "any mic = call" behavior).
+        """
         matched = []
+        wildcard = "*" in self.call_apps
         for app in apps:
             normalized = app.lower()
             if any(ignored in normalized for ignored in self.ignored_apps):
                 continue
+            # Empty call_apps = no auto-pause (whitelist semantics)
             if not self.call_apps:
-                matched.append(app)
                 continue
-            if any(allowed in normalized for allowed in self.call_apps):
+            if wildcard or any(allowed in normalized for allowed in self.call_apps):
                 matched.append(app)
         return matched
 

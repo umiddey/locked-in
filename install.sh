@@ -9,7 +9,7 @@ echo "--- Installing Locked-In ---"
 # 1. System Dependency Detection
 if command -v pacman &> /dev/null; then
     echo "[1/5] Arch Linux detected. Installing dependencies via pacman..."
-    sudo pacman -S --needed python qt6-base hyprlock pulseaudio-utils
+    sudo pacman -S --needed python qt6-base hyprlock libpulse
 elif command -v apt-get &> /dev/null; then
     echo "[1/5] Debian/Ubuntu detected. Installing dependencies via apt..."
     sudo apt-get update
@@ -121,6 +121,10 @@ echo "[6/6] Reloading and starting services..."
 systemctl --user daemon-reload
 systemctl --user enable --now locked-in.service
 systemctl --user enable --now locked-in-web.service
+
+# Enable lingering for the current user so services start on boot
+echo "[*] Enabling user lingering for persistent startup..."
+sudo loginctl enable-linger $(whoami)
 
 echo "------------------------------------------------"
 echo "DONE! Locked-In is installed and active."

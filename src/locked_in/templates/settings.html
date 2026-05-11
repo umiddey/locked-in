@@ -16,10 +16,6 @@ h1{font-family:var(--sans);font-size:22px;font-weight:700;color:var(--txh);margi
 .actions{display:flex;gap:10px;margin-top:20px}
 {% endblock %}
 
-{% block nav_right %}
-    <a href="/" class="nav__btn">&#8592; Dashboard</a>
-{% endblock %}
-
 {% block banner %}
     {% if message %}
     <div class="ban {{ 'ban--err' if is_error else '' }}">{{ message }}</div>
@@ -31,16 +27,21 @@ h1{font-family:var(--sans);font-size:22px;font-weight:700;color:var(--txh);margi
 
 <form method="post" action="/settings">
 <div class="section">
-    <div class="section__title">Break Schedule</div>
+    <div class="section__title">Stretch Lockout</div>
     <div class="field">
-        <label class="field__label">Work interval</label>
-        <input type="number" name="schedule__stretch_interval_minutes" value="{{ config.schedule.stretch_interval_minutes }}" min="1" max="480" />
-        <div class="field__hint">Minutes of continuous work before a break is enforced</div>
+        <label class="field__label">Enabled</label>
+        <input type="checkbox" name="stretch_lockout__enabled" value="on" {{ 'checked' if config.stretch_lockout.enabled else '' }} />
+        <div class="field__hint">Lock your screen after continuous work to force a break</div>
     </div>
     <div class="field">
-        <label class="field__label">Break duration</label>
-        <input type="number" name="schedule__stretch_duration_minutes" value="{{ config.schedule.stretch_duration_minutes }}" min="1" max="60" />
-        <div class="field__hint">Minutes you must take a break for</div>
+        <label class="field__label">Work interval</label>
+        <input type="number" name="stretch_lockout__interval_minutes" value="{{ config.stretch_lockout.interval_minutes }}" min="1" max="480" />
+        <div class="field__hint">Minutes of continuous work before screen locks</div>
+    </div>
+    <div class="field">
+        <label class="field__label">Lock duration</label>
+        <input type="number" name="stretch_lockout__duration_minutes" value="{{ config.stretch_lockout.duration_minutes }}" min="1" max="60" />
+        <div class="field__hint">Minutes the screen stays locked</div>
     </div>
 </div>
 
@@ -103,6 +104,39 @@ h1{font-family:var(--sans);font-size:22px;font-weight:700;color:var(--txh);margi
         <div class="field__hint">Open the web dashboard in your browser when you log in (Hyprland)</div>
     </div>
 </div>
+
+<div class="section">
+    <div class="section__title">Backup</div>
+    <div class="field">
+        <label class="field__label">Enabled</label>
+        <input type="checkbox" name="backup__enabled" value="on" {{ 'checked' if config.backup.enabled else '' }} />
+        <div class="field__hint">Back up your data on each session end</div>
+    </div>
+    <div class="field">
+        <label class="field__label">Backup folder</label>
+        <input type="text" name="backup__path" value="{{ config.backup.path }}" placeholder="~/Dropbox/locked-in-backup" />
+        <div class="field__hint">Local folder to store backup copies of your database</div>
+    </div>
+    <div class="field">
+        <label class="field__label">Backup now</label>
+        <button type="button" class="btn" onclick="fetch('/backup',{method:'POST'}).then(r=>r.json()).then(d=>alert(d.status||d.error))">Run Backup</button>
+        <div class="field__hint">Immediately back up the database to the configured folder</div>
+    </div>
+</div>
+
+<div class="section">
+    <div class="section__title" style="color:var(--red)">Danger Zone</div>
+    <div class="field">
+        <label class="field__label">Reset entire day</label>
+        <form method="post" action="/day/reset" onsubmit="return confirm('RESET ENTIRE DAY? This will delete all runs and timeline for today.')">
+            <input type="hidden" name="date" value="{{ target_date_iso }}" />
+            <button class="btn btn--red" type="submit">Reset Day</button>
+        </form>
+        <div class="field__hint">Wipe all progress for the current day and start fresh.</div>
+    </div>
+</div>
+
+{% include "components/calibrate.html" %}
 
 <div class="actions">
     <button class="btn btn--primary" type="submit">Save Settings</button>

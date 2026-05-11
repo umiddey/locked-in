@@ -28,15 +28,13 @@ class IdleDetector:
 
     _POLL_INTERVAL = 1.0
 
-    # Thresholds for "Hard" activity (intentional input for resuming)
+    # Class-level defaults for "Hard" activity (intentional input for resuming)
     _HARD_THRESHOLDS: dict[str, int] = {
         "i8042": 3,       # keyboard only (IRQ 1)
         "xhci_hcd": 10,   # USB host controller
     }
 
-    # Thresholds for "Soft" activity (any input to keep the session alive)
-    # We set these to 1 to catch even a single interrupt, but we'll monitor
-    # if this prevents pausing entirely on noisy hardware.
+    # Class-level defaults for "Soft" activity (any input to keep the session alive)
     _SOFT_THRESHOLDS: dict[str, int] = {
         "i8042": 1,
         "xhci_hcd": 1,
@@ -45,10 +43,15 @@ class IdleDetector:
     # IRQ numbers to EXCLUDE even if they match a monitored name.
     _EXCLUDE_IRQ_NUMS: set[str] = {"12"}
 
-    _INPUT_IRQ_NAMES = set(_HARD_THRESHOLDS.keys())
+    _INPUT_IRQ_NAMES = {"i8042", "xhci_hcd"}
 
-    def __init__(self, idle_seconds: int = 60):
+    def __init__(self, idle_seconds: int = 60, soft_thresholds: dict[str, int] | None = None, hard_thresholds: dict[str, int] | None = None):
         self.idle_seconds = idle_seconds
+        
+        # Instance-level thresholds (allows override via calibration or config)
+        self.soft_thresholds = soft_thresholds or self._SOFT_THRESHOLDS.copy()
+        self.hard_thresholds = hard_thresholds or self._HARD_THRESHOLDS.copy()
+        
         self._last_soft_activity: float = time.monotonic()
         self._last_hard_activity: float = time.monotonic()
         self._stop_event = threading.Event()
@@ -80,6 +83,35 @@ class IdleDetector:
     def is_idle(self) -> bool:
         """Check if user has been soft-idle longer than threshold."""
         return self.seconds_since_any_activity() >= self.idle_seconds
+
+    def capture_deltas(self, duration_seconds: int) -> dict[str, list[int]]:
+        """Record interrupt deltas for a period of time.
+        
+        Returns a dict mapping IRQ name (e.g. 'i8042') to a list of recorded deltas per poll.
+        """
+        start_time = time.monotonic()
+        results: dict[str, list[int]] = {name: [] for name in self._INPUT_IRQ_NAMES}
+        
+        prev = self._read_input_irqs()
+        while time.monotonic() - start_time < duration_seconds:
+            time.sleep(1.0)
+            current = self._read_input_irqs()
+            
+            # Aggregate by IRQ name (summing multiple IRQs of same type if present)
+            deltas_this_poll: dict[str, int] = {name: 0 for name in self._INPUT_IRQ_NAMES}
+            for key in current:
+                delta = current.get(key, 0) - prev.get(key, 0)
+                if delta < 0: continue
+                irq_name = key.split("_", 1)[1] if "_" in key else ""
+                if irq_name in deltas_this_poll:
+                    deltas_this_poll[irq_name] += delta
+            
+            for name, d in deltas_this_poll.items():
+                results[name].append(d)
+                
+            prev = current
+            
+        return results
 
     @staticmethod
     def _read_input_irqs() -> dict[str, int]:
@@ -133,8 +165,8 @@ class IdleDetector:
                     
                 irq_name = key.split("_", 1)[1] if "_" in key else ""
                 
-                soft_thresh = self._SOFT_THRESHOLDS.get(irq_name, 1)
-                hard_thresh = self._HARD_THRESHOLDS.get(irq_name, 3)
+                soft_thresh = self.soft_thresholds.get(irq_name, 1)
+                hard_thresh = self.hard_thresholds.get(irq_name, 3)
                 
                 if delta >= soft_thresh:
                     soft_found = True

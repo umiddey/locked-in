@@ -1,0 +1,10 @@
+<div class="side-panel__head">
+    <button class="side-panel__close" onclick="closeTaskDetail()">&times;</button>
+    <div class="side-panel__title">Task Detail</div>
+</div>
+<div class="side-panel__body">
+    {% block content %}{% endblock %}
+</div>
+<script>
+    {% block extra_js %}{% endblock %}
+</script>

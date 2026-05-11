@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+{% extends "base.html" if not is_fragment else "fragment_base.html" %}
 
 {% block title %}{{ task_name }} — Locked-In{% endblock %}
 
@@ -46,6 +46,13 @@
 .act-notes{font-family:var(--mono);font-size:11px;padding:6px 10px;border-radius:var(--r);border:1px solid var(--b2);background:var(--s2);color:var(--tx);resize:vertical;min-height:36px;width:100%}
 .act-notes:focus{outline:none;border-color:var(--ambb)}
 
+.hero__header{display:flex;justify-content:space-between;align-items:flex-start}
+.edit-form{background:var(--s2);border:1px solid var(--b2);border-radius:var(--rl);padding:20px;margin-bottom:16px;display:none}
+.edit-form__grid{display:grid;grid-template-columns:1fr 80px;gap:12px;margin-bottom:12px}
+.edit-form label{display:block;font-family:var(--mono);font-size:10px;color:var(--dim);margin-bottom:4px;text-transform:uppercase}
+.edit-form input{background:var(--s1);border:1px solid var(--b1);color:var(--tx);padding:8px 12px;border-radius:var(--r);font-family:var(--mono);font-size:13px;width:100%}
+.edit-form .btn-row{display:flex;gap:8px}
+
 @media(max-width:640px){
     .shell{padding:12px 10px 60px}
     .hero{padding:20px 18px}
@@ -59,14 +66,46 @@
 
 {% block nav_right %}
     <a href="{{ back_url }}" class="nav__btn">&#8592; Back</a>
+    {{ super() }}
 {% endblock %}
 
 {% block content %}
 <div class="hero">
-    <div class="hero__date">{{ target_date }}</div>
-    <div class="hero__name">{{ task_name }}</div>
-    <div class="hero__status">{{ completed_status }} &middot; #{{ position + 1 }} in plan &middot; Est. {{ est_m }}m</div>
+    <div class="hero__header">
+        <div>
+            <div class="hero__date">{{ target_date }}</div>
+            <div class="hero__name">{{ task_name }}</div>
+            <div class="hero__status">{{ completed_status }} &middot; #{{ position + 1 }} in plan &middot; Est. {{ est_m }}m</div>
+        </div>
+        {% if can_edit %}
+        <button class="nav__btn" onclick="toggleEdit()">&#9998; Edit</button>
+        {% endif %}
+    </div>
 </div>
+
+{% if can_edit %}
+<div id="edit-form" class="edit-form">
+    <form method="post" action="/task/edit">
+        <input type="hidden" name="task_id" value="{{ task_id }}"/>
+        <input type="hidden" name="date" value="{{ target_date_iso }}"/>
+        <input type="hidden" name="redirect_to" value="/task/{{ task_id }}"/>
+        <div class="edit-form__grid">
+            <div>
+                <label>Task Name</label>
+                <input type="text" name="task_name" value="{{ task_name }}"/>
+            </div>
+            <div>
+                <label>Minutes</label>
+                <input type="number" name="duration_minutes" value="{{ est_m }}" min="1"/>
+            </div>
+        </div>
+        <div class="btn-row">
+            <button type="submit" class="btn btn--primary">Save Changes</button>
+            <button type="button" class="btn" onclick="toggleEdit()">Cancel</button>
+        </div>
+    </form>
+</div>
+{% endif %}
 
 <div class="mbar">
     <div class="mbar__cell">
@@ -124,6 +163,11 @@
 {% endblock %}
 
 {% block extra_js %}
+window.toggleEdit = function() {
+    const f = document.getElementById('edit-form');
+    f.style.display = (f.style.display === 'block') ? 'none' : 'block';
+};
+
 document.querySelectorAll('.tc').forEach(el => {
     el.addEventListener('click', () => {
         const panel = document.getElementById('segment-detail');

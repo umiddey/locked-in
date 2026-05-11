@@ -11,15 +11,12 @@ TRANSITIONS: dict[State, set[State]] = {
     State.IDLE: {State.AWAITING_TASK_START, State.FINISHED},
     State.AWAITING_TASK_START: {
         State.TASK_ACTIVE,
-        State.AWAITING_BREAK_START,
         State.PAUSED,
         State.GIVEN_UP,
         State.FINISHED,
     },
-    State.TASK_ACTIVE: {State.AWAITING_TASK_START, State.AWAITING_BREAK_START, State.PAUSED, State.GIVEN_UP, State.FINISHED},
-    State.AWAITING_BREAK_START: {State.BREAK_ACTIVE, State.PAUSED, State.GIVEN_UP, State.FINISHED},
-    State.BREAK_ACTIVE: {State.AWAITING_TASK_START, State.PAUSED, State.GIVEN_UP, State.FINISHED},
-    State.PAUSED: {State.AWAITING_TASK_START, State.TASK_ACTIVE, State.AWAITING_BREAK_START, State.BREAK_ACTIVE, State.GIVEN_UP},
+    State.TASK_ACTIVE: {State.AWAITING_TASK_START, State.PAUSED, State.GIVEN_UP, State.FINISHED},
+    State.PAUSED: {State.AWAITING_TASK_START, State.TASK_ACTIVE, State.GIVEN_UP},
     State.GIVEN_UP: set(),
     State.FINISHED: set(),
 }

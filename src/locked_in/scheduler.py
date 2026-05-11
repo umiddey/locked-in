@@ -14,7 +14,8 @@ def build_schedule(
 ) -> list[ScheduleItem]:
     """Build a deterministic schedule from tasks and config.
 
-    Pure function — no datetime.now() calls.
+    Pure function — no datetime.now() calls. Stretch lockouts are handled
+    independently by StretchLockout, not inserted into the schedule.
     """
     items: list[ScheduleItem] = []
     now = session_start
@@ -27,21 +28,8 @@ def build_schedule(
 
     # Grace period before first task
     cursor = now + timedelta(seconds=grace_seconds)
-    accumulated_work = 0
 
     for task in tasks:
-        # Insert stretch break if accumulated work exceeds threshold
-        while accumulated_work >= config.stretch_interval_minutes:
-            accumulated_work -= config.stretch_interval_minutes
-            if cursor + timedelta(minutes=config.stretch_duration_minutes) < shutdown_deadline:
-                items.append(ScheduleItem(
-                    kind=ScheduleKind.STRETCH,
-                    title="Stretch Break",
-                    scheduled_start=cursor,
-                    duration_minutes=config.stretch_duration_minutes,
-                ))
-                cursor += timedelta(minutes=config.stretch_duration_minutes)
-
         duration = task.estimate_minutes or config.default_task_minutes
 
         # Check if task would cross shutdown
@@ -56,7 +44,6 @@ def build_schedule(
                     task_ref=task,
                 ))
                 cursor = shutdown_deadline
-                accumulated_work += remaining
             break
 
         items.append(ScheduleItem(
@@ -67,7 +54,6 @@ def build_schedule(
             task_ref=task,
         ))
         cursor += timedelta(minutes=duration)
-        accumulated_work += duration
 
     # Shutdown warning
     if config.hard_shutdown_enabled:
