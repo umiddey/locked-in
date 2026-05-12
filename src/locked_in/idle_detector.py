@@ -41,16 +41,17 @@ class IdleDetector:
     }
 
     # IRQ numbers to EXCLUDE even if they match a monitored name.
-    _EXCLUDE_IRQ_NUMS: set[str] = {"12"}
+    _EXCLUDE_IRQ_NUMS: set[str] = set()
 
     _INPUT_IRQ_NAMES = {"i8042", "xhci_hcd"}
 
-    def __init__(self, idle_seconds: int = 60, soft_thresholds: dict[str, int] | None = None, hard_thresholds: dict[str, int] | None = None):
+    def __init__(self, idle_seconds: int = 60, soft_thresholds: dict[str, int] | None = None, hard_thresholds: dict[str, int] | None = None, exclude_irqs: list[str] | None = None):
         self.idle_seconds = idle_seconds
         
         # Instance-level thresholds (allows override via calibration or config)
         self.soft_thresholds = soft_thresholds or self._SOFT_THRESHOLDS.copy()
         self.hard_thresholds = hard_thresholds or self._HARD_THRESHOLDS.copy()
+        self.exclude_irqs = set(exclude_irqs) if exclude_irqs is not None else self._EXCLUDE_IRQ_NUMS.copy()
         
         self._last_soft_activity: float = time.monotonic()
         self._last_hard_activity: float = time.monotonic()
@@ -87,34 +88,30 @@ class IdleDetector:
     def capture_deltas(self, duration_seconds: int) -> dict[str, list[int]]:
         """Record interrupt deltas for a period of time.
         
-        Returns a dict mapping IRQ name (e.g. 'i8042') to a list of recorded deltas per poll.
+        Returns a dict mapping IRQ key (e.g. '49_xhci_hcd') to a list of recorded deltas per poll.
         """
         start_time = time.monotonic()
-        results: dict[str, list[int]] = {name: [] for name in self._INPUT_IRQ_NAMES}
         
-        prev = self._read_input_irqs()
+        # Read initial state to find all available IRQs
+        prev = self._read_input_irqs(include_excluded=True)
+        results: dict[str, list[int]] = {key: [] for key in prev}
+        
         while time.monotonic() - start_time < duration_seconds:
             time.sleep(1.0)
-            current = self._read_input_irqs()
+            current = self._read_input_irqs(include_excluded=True)
             
-            # Aggregate by IRQ name (summing multiple IRQs of same type if present)
-            deltas_this_poll: dict[str, int] = {name: 0 for name in self._INPUT_IRQ_NAMES}
-            for key in current:
+            for key in results:
                 delta = current.get(key, 0) - prev.get(key, 0)
-                if delta < 0: continue
-                irq_name = key.split("_", 1)[1] if "_" in key else ""
-                if irq_name in deltas_this_poll:
-                    deltas_this_poll[irq_name] += delta
-            
-            for name, d in deltas_this_poll.items():
-                results[name].append(d)
+                if delta < 0:
+                    results[key].append(0)
+                else:
+                    results[key].append(delta)
                 
             prev = current
             
         return results
 
-    @staticmethod
-    def _read_input_irqs() -> dict[str, int]:
+    def _read_input_irqs(self, include_excluded: bool = False) -> dict[str, int]:
         """Read total interrupt counts for input-related IRQs from /proc/interrupts."""
         result: dict[str, int] = {}
         try:
@@ -124,9 +121,9 @@ class IdleDetector:
                     if len(parts) < 2:
                         continue
                     desc = parts[-1]
-                    if desc in IdleDetector._INPUT_IRQ_NAMES:
+                    if desc in self._INPUT_IRQ_NAMES:
                         irq_num = parts[0].rstrip(":")
-                        if irq_num in IdleDetector._EXCLUDE_IRQ_NUMS:
+                        if not include_excluded and irq_num in self.exclude_irqs:
                             continue
                         total = 0
                         for val in parts[1:]:

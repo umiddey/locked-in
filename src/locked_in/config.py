@@ -117,6 +117,7 @@ class AutoPauseConfig:
     ignored_apps: list[str] = field(default_factory=list)
     idle_pause_seconds: int = 60
     idle_resume_grace_seconds: int = 3
+    exclude_irqs: list[str] = field(default_factory=list)
     soft_threshold_i8042: int = 1
     soft_threshold_xhci_hcd: int = 1
     hard_threshold_i8042: int = 3

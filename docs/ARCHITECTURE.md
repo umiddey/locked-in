@@ -5,7 +5,7 @@
 Locked-In is a **Linux desktop focus enforcer** with two runtime modes:
 
 1. **Web dashboard** (`locked-in web`) — a standalone HTTP server at `localhost:8765` with a Jinja2-rendered UI for task planning, session control, and metrics. Works on any OS with a browser.
-2. **Legacy daemon** (`locked-in run-legacy`) — the full enforcement engine: PyQt6 blocker windows, auto-pause on idle/mic, stretch lockouts, hard shutdown. Built for Hyprland/Wayland.
+2. **Legacy daemon** (`locked-in run-legacy`) — the enforcement engine: PyQt6 blocker windows, idle/mic observation, stretch lockouts, hard shutdown. Built for Hyprland/Wayland.
 
 Both modes share the same data layer (`SimpleTodoStore` → SQLite). The web dashboard can also send commands to a running daemon via a Unix domain socket.
 
@@ -25,8 +25,8 @@ Both modes share the same data layer (`SimpleTodoStore` → SQLite). The web das
    ┌─────────────────────────────────────────┐
    │          SimpleTodoStore (SQLite)        │
    │  plans, plan_tasks, task_runs,          │
-   │  sessions_v2, time_blocks,              │
-   │  tracking_events                        │
+   │  task_runtime, sessions_v2,            │
+   │  time_blocks, tracking_events           │
    └─────────────────────────────────────────┘
 ```
 
@@ -52,9 +52,9 @@ Parses CLI args and dispatches:
 
 ---
 
-## Web Frontend — `web_frontend.py` (47KB)
+## Web Frontend — `web_frontend.py` (53KB)
 
-A `ThreadingHTTPServer` with Jinja2 templates. All routes are dispatched in a single `Handler` class.
+A `ThreadingHTTPServer` with Jinja2 templates. All routes are dispatched in a single `Handler` class nested inside `LockedInWebFrontend`.
 
 ### Routes
 
@@ -62,30 +62,47 @@ A `ThreadingHTTPServer` with Jinja2 templates. All routes are dispatched in a si
 |------|--------|---------|
 | `/` | GET | Dashboard — today's plan, active task, timer |
 | `/plan` | GET/POST | Plan page — add/edit/reorder tasks |
-| `/start` | POST | Start a task |
-| `/pause` | POST | Pause current task |
-| `/resume` | POST | Resume current task |
-| `/finish` | POST | Finish current task |
-| `/extend` | POST | Extend current task time |
 | `/settings` | GET/POST | View/edit config.toml settings |
-| `/calibrate` | POST | Run idle detector calibration |
-| `/metrics` | GET | Daily/weekly metrics dashboard |
-| `/api/status` | GET | JSON status of current session |
-| `/api/plan` | GET | JSON plan data |
-| `/api/metrics` | GET | JSON metrics |
+| `/history` | GET | Historical metrics view |
+| `/fragments/dashboard` | GET | HTMX partial dashboard fragments |
+| `/run/start-current` | POST | Start current task |
+| `/run/pause` | POST | Pause current task |
+| `/run/resume` | POST | Resume current task |
+| `/run/finish-current` | POST | Finish current task |
+| `/run/extend` | POST | Extend current task time |
+| `/session/start` | POST | Start a session |
+| `/task/delete` | POST | Delete a task |
+| `/task/edit` | POST | Edit task name/duration |
+| `/task/move` | POST | Reorder tasks up/down |
+| `/task/notes` | POST | Save task notes on finish |
+| `/day/reset` | POST | Reset a day's progress |
+| `/backup` | POST | Backup the SQLite DB |
+| `/calibrate` | POST | Run idle detector calibration (idle/active phase) |
+| `/calibrate/apply` | POST | Apply calibration thresholds to config |
 
 ### Templates
 
 Located in `src/locked_in/templates/`, rendered with Jinja2:
 
-- `base.html` — shared layout (nav, styles)
+**Pages:**
+- `base.html` — shared layout (nav, styles, scripts)
 - `index.html` — main dashboard
 - `settings.html` — config editor
-- `components/calibrate.html` — idle calibration UI fragment
+- `history.html` — historical metrics page
+- `task_detail.html` — side panel for task detail view
+- `fragment_base.html` — base layout for HTMX fragments
+
+**Components (in `components/`):**
+- `banner.html` — notification banner fragment
+- `calibrate.html` — idle calibration UI fragment
+- `metrics.html` — metrics display fragment
+- `notes.html` — task notes fragment
+- `schedule.html` — schedule list fragment
+- `task_metrics.html` — per-task metrics fragment
 
 ---
 
-## Daemon — `daemon.py` (32KB)
+## Daemon — `daemon.py` (35KB)
 
 The core enforcement engine. Only runs in `run-legacy` mode.
 
@@ -94,13 +111,15 @@ The core enforcement engine. Only runs in `run-legacy` mode.
 1. **Bootstrap** — loads today's plan from `SimpleTodoStore`, builds a schedule via `scheduler.py`, creates a session in `Database` (legacy DB)
 2. **Main loop** — polls an event queue for `TICK`, `USER_ACTIVITY_HARD`, `MIC_ACTIVE`, `MIC_SILENT` events
 3. **Tick logic** (every ~1s):
-   - Checks idle auto-pause
+   - Checks idle auto-pause by querying the store-backed runtime state
    - Checks ETA warnings (5 min before task ends)
    - Checks hard shutdown deadline
-   - Advances schedule (activates next task/break)
+   - Advances schedule decisions using store projections, not daemon-owned ETA clocks
 4. **Shutdown** — on `GIVEN_UP`, `FINISHED`, or hard shutdown → closes all time blocks, ends session, stops loop
 
-### State Machine
+### State Machine — `state_machine.py`
+
+Dedicated module with `StateMachine` class and explicit `TRANSITIONS` map. States and allowed transitions:
 
 ```
 IDLE → AWAITING_TASK_START → TASK_ACTIVE
@@ -112,7 +131,12 @@ IDLE → AWAITING_TASK_START → TASK_ACTIVE
   └──── FINISHED                └──── FINISHED
 ```
 
-**PAUSED** is special — it remembers the previous state and resumes back to it.
+Additional transitions:
+- `TASK_ACTIVE` → `AWAITING_TASK_START` (task finished, next task)
+- `PAUSED` → `AWAITING_TASK_START` or `TASK_ACTIVE` (resume returns to previous state)
+- `PAUSED` → `GIVEN_UP`
+
+**PAUSED** is special — `StateMachine` stores `_previous_state` and `resume()` returns to it.
 
 ### Schedule Building — `scheduler.py`
 
@@ -144,7 +168,7 @@ Three decoupled services run as daemon threads, pushing events to a shared `Queu
 | Service | Poll Rate | Event | Purpose |
 |---------|-----------|-------|---------|
 | `TickService` | 1s | `TICK` | Drives the main tick loop |
-| `IdleService` | 0.5s | `USER_ACTIVITY_SOFT`, `USER_ACTIVITY_HARD` | Forwards idle detector state changes |
+| `IdleService` | 0.5s | `USER_ACTIVITY_SOFT`, `USER_ACTIVITY_HARD` | Forwards idle detector state changes so the daemon can pause/resume the store-backed runtime |
 | `MicService` | configurable (default 5s) | `MIC_ACTIVE`, `MIC_SILENT` | Forwards mic activity snapshots |
 
 ---
@@ -158,9 +182,11 @@ Since Wayland/Hyprland exclusively grabs `/dev/input/event*`, idle detection wor
 - Monitors IRQs for `i8042` (keyboard) and `xhci_hcd` (USB)
 - Excludes IRQ 12 (touchpad — has phantom noise on Synaptics)
 - Two sensitivity levels:
-  - **Soft** — any input above threshold → resets "last activity" timer
-  - **Hard** — intentional input (higher threshold) → triggers resume from idle-pause
+- **Soft** — any input above threshold → resets "last activity" timer used for pause decisions
+- **Hard** — intentional input (higher threshold) → triggers resume from idle-pause
 - Thresholds are configurable via `config.toml` and the calibration UI
+
+The daemon uses this detector only as an input signal source. Persisted runtime state in `SimpleTodoStore` remains the source of truth for whether a task is running or paused.
 
 ### Calibration (`/calibrate` endpoint)
 
@@ -188,30 +214,31 @@ Detects microphone usage via `pactl list source-outputs` (PipeWire/PulseAudio).
 
 ## Stretch Lockout — `stretch_lockout.py`
 
-**Opt-in** (`[stretch_lockout] enabled = true` in config). Tracks cumulative work time across task boundaries. When the counter hits `interval_minutes` (default 60):
+**Opt-in** (`[stretch_lockout] enabled = true` in config). Tracks cumulative work time across task boundaries using store-derived work seconds. When the counter hits `interval_minutes` (default 60):
 
 1. Locks the screen via `hyprlock`
 2. Waits `duration_minutes` (default 5)
 3. Unlocks via `loginctl unlock-session`
 4. Resets the counter
 
-The counter pauses when the session is paused and only resets after a full break completes or the session ends.
+The counter pauses when the session is paused and only resets after a full break completes or the session ends. The daemon does not own the work clock; it feeds the lockout with `SimpleTodoStore.get_cumulative_work_seconds()`.
 
 ---
 
 ## ETA Warning — `eta_warning.py`
 
-A PyQt6 popup shown 5 minutes before a task's ETA. Offers two choices:
+A PyQt6 popup shown 5 minutes before a task's ETA. Offers three choices:
 - **Finish Task** — marks the task complete
 - **Extend +Xm** — adds more time (default = task's original estimate or `default_extend_minutes`)
+- **Auto-Continue** — enables auto-chaining to the next task after the current one finishes
 
-Shows an overtime counter while the popup is displayed.
+Shows an overtime counter while the popup is displayed. Also sends a notification about the next upcoming task at the 5-minute mark.
 
 ---
 
 ## Data Layer
 
-### `SimpleTodoStore` (`simple_store.py`, 70KB)
+### `SimpleTodoStore` (`simple_store.py`, 73KB)
 
 The primary data store. SQLite at `~/.local/share/locked-in/simple_todos.db`.
 
@@ -223,6 +250,7 @@ The primary data store. SQLite at `~/.local/share/locked-in/simple_todos.db`.
 | `plan_tasks` | Tasks within a plan: name, duration, position, completion status |
 | `daily_sessions` | Session start time per date |
 | `task_runs` | Individual task execution records: start, end, duration, outcome, notes |
+| `task_runtime` | Active task runtime tracking with pause accumulation, ETAs, work block refs |
 | `sessions_v2` | Enhanced session tracking with status, source, timestamps |
 | `tracking_events` | Event log: task_started, task_finished, pause_started, etc. |
 | `time_blocks` | Time intervals: work, pause, call, break, idle blocks with metadata |
@@ -236,6 +264,7 @@ The primary data store. SQLite at `~/.local/share/locked-in/simple_todos.db`.
 - `start_time_block()` / `finish_time_block()` — track work/pause/break intervals
 - `log_event()` — append to tracking_events
 - `project_runtime_schedule()` — compute projected schedule with ETAs
+- `backup_to()` — backup the SQLite DB to a destination path
 
 ### `Database` (`db.py`, legacy)
 
@@ -259,7 +288,7 @@ Unix domain socket IPC at `~/.local/state/locked-in/control.sock`.
 **Client** sends JSON: `{"command": "pause"}`
 **Server** responds JSON: `{"status": "paused"}`
 
-Supported commands: `pause`, `resume`, `give_up`, `status`, `start_task`, `pause_task`, `resume_task`, `finish_task`, `extend_task`
+Supported commands: `pause`, `resume`, `give_up`, `status`, `start_task`, `pause_task`, `resume_task`, `finish_task`, `extend_task`, `set_auto_chain`
 
 ---
 
@@ -320,13 +349,14 @@ Layered config from multiple sources (priority: env vars > .env > config.toml > 
 
 | Section | Key fields | Purpose |
 |---------|-----------|---------|
-| `schedule` | shutdown time, task defaults | Deadline and scheduling |
+| `schedule` | shutdown time, task defaults | Deadline and scheduling; runtime ETA is derived from `task_runtime.compute_eta()` |
 | `stretch_lockout` | enabled, interval, duration | Opt-in screen lock for breaks |
 | `warden` | grace period, give-up cooldown, extend minutes | Enforcement behavior |
 | `control` | socket path | IPC socket location |
 | `ui` | theme, blocker window toggle | UI preferences |
 | `web` | port, auto-open | Web server settings |
 | `auto_pause` | idle/mic thresholds, call apps | Auto-pause sensitivity |
+| `backup` | enabled, path | Database backup settings |
 
 Config is also editable from the web dashboard at `/settings`.
 
@@ -338,10 +368,27 @@ Core data structures used across the system:
 
 - `Session` / `SessionStatus` — daemon session lifecycle
 - `Task` / `TaskStatus` — scheduled task with actuals
+- `TaskRuntime` — persisted runtime row; source of truth for running/paused state and ETA math
 - `NormalizedTask` — plan-agnostic task representation
-- `ScheduleItem` / `ScheduleKind` — scheduled time slots (task, stretch, shutdown)
+- `ScheduleItem` / `ScheduleKind` — scheduled time slots (task, shutdown_warning, shutdown)
 - `Interruption` — pause/call records
-- `State` — state machine states
+- `State` — state machine states (IDLE, AWAITING_TASK_START, TASK_ACTIVE, PAUSED, GIVEN_UP, FINISHED)
+
+---
+
+## PyQt6 UI Modules
+
+### `simple_app.py` / `simple_ui.py`
+
+Used by the `run` and `open` CLI commands. `SimpleTodoApp` launches a lightweight PyQt6 planner window (`launch_planner_window`) for task entry, and a schedule dashboard (`launch_schedule_dashboard`) for runtime monitoring. These are the non-daemon UI path.
+
+### `ui.py`
+
+Contains `BlockerWindow` — the full-screen PyQt6 overlay shown by the daemon when a task is about to start. Offers "Confirm" and "Give Up" buttons. Toggled by `[ui] show_blocker_window`.
+
+### `learner.py`
+
+Placeholder module for a future v2 duration estimation system. Currently unused.
 
 ---
 

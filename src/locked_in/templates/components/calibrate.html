@@ -18,7 +18,22 @@
             </div>
         </div>
 
-        <button type="button" class="btn btn--primary" id="btn-start-cal">Learn My Hardware</button>
+        <div style="margin-top:12px; padding:12px; background:var(--s2); border-radius:var(--r); border:1px solid var(--b1)">
+            <div style="font-family:var(--mono); font-size:10px; color:var(--dim); text-transform:uppercase; margin-bottom:10px">Manual Override</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; align-items:center; font-family:var(--mono); font-size:12px; margin-bottom:10px">
+                <span style="color:var(--dim)">Device</span><span style="color:var(--dim)">Soft</span><span style="color:var(--dim)">Hard</span>
+                <span style="color:var(--txh)">Keyboard</span>
+                <input id="man-soft-i8042" type="number" min="1" max="999" value="{{ config.auto_pause.soft_threshold_i8042|default(1) }}" style="background:var(--s1);border:1px solid var(--b1);color:var(--grnh);padding:4px 6px;border-radius:var(--r);font-family:var(--mono);font-size:12px;width:100%;text-align:center" />
+                <input id="man-hard-i8042" type="number" min="1" max="999" value="{{ config.auto_pause.hard_threshold_i8042|default(3) }}" style="background:var(--s1);border:1px solid var(--b1);color:var(--amb);padding:4px 6px;border-radius:var(--r);font-family:var(--mono);font-size:12px;width:100%;text-align:center" />
+                <span style="color:var(--txh)">USB/Mouse</span>
+                <input id="man-soft-xhci" type="number" min="1" max="999" value="{{ config.auto_pause.soft_threshold_xhci_hcd|default(1) }}" style="background:var(--s1);border:1px solid var(--b1);color:var(--grnh);padding:4px 6px;border-radius:var(--r);font-family:var(--mono);font-size:12px;width:100%;text-align:center" />
+                <input id="man-hard-xhci" type="number" min="1" max="999" value="{{ config.auto_pause.hard_threshold_xhci_hcd|default(10) }}" style="background:var(--s1);border:1px solid var(--b1);color:var(--amb);padding:4px 6px;border-radius:var(--r);font-family:var(--mono);font-size:12px;width:100%;text-align:center" />
+            </div>
+            <button type="button" class="btn" id="btn-manual-apply">Apply Manual</button>
+            <span id="man-status" style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-left:10px"></span>
+        </div>
+
+        <button type="button" class="btn btn--primary" id="btn-start-cal" style="margin-top:12px">Learn My Hardware</button>
     </div>
     
     <div id="cal-modal" style="display:none; margin-top:16px; padding:16px; background:var(--s2); border-radius:var(--r); border:1px solid var(--ambb)">
@@ -76,6 +91,26 @@
         return await resp.json();
     };
 
+    document.getElementById('btn-manual-apply').addEventListener('click', async () => {
+        const soft = {
+            i8042: parseInt(document.getElementById('man-soft-i8042').value),
+            xhci_hcd: parseInt(document.getElementById('man-soft-xhci').value),
+        };
+        const hard = {
+            i8042: parseInt(document.getElementById('man-hard-i8042').value),
+            xhci_hcd: parseInt(document.getElementById('man-hard-xhci').value),
+        };
+        const status = document.getElementById('man-status');
+        status.textContent = 'Saving…';
+        const resp = await fetch('/calibrate/apply', {
+            method: 'POST',
+            body: new URLSearchParams({ soft: JSON.stringify(soft), hard: JSON.stringify(hard) })
+        });
+        const data = await resp.json();
+        status.textContent = data.status === 'success' ? 'Saved ✓' : 'Error — check daemon';
+        if (data.status === 'success') setTimeout(() => location.reload(), 800);
+    });
+
     btnStart.addEventListener('click', async () => {
         btnStart.style.display = 'none';
         modal.style.display = 'block';
@@ -112,29 +147,49 @@
     const showResults = () => {
         results.style.display = 'block';
         const table = document.getElementById('cal-table');
-        const soft = {}, hard = {};
+        const soft = {}, hard = {}, exclude = [];
         
-        let html = '<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; border-bottom:1px solid var(--b1); padding-bottom:4px; margin-bottom:8px; color:var(--dim)"><span>Device</span><span>Soft</span><span>Hard</span></div>';
+        let html = '<div style="display:grid; grid-template-columns:1.5fr 1fr 1fr 0.5fr; gap:8px; border-bottom:1px solid var(--b1); padding-bottom:4px; margin-bottom:8px; color:var(--dim)"><span>Device</span><span>Soft</span><span>Hard</span><span>Ignore</span></div>';
         
-        for (const [name, noise] of Object.entries(idleData.noise)) {
-            const signal = activeData.signal[name] || 0;
-            soft[name] = noise + 1;
-            hard[name] = Math.max(soft[name] + 1, Math.floor(signal * 0.5));
+        // Group by type for the main thresholds, but show individual IRQs
+        const types = ['i8042', 'xhci_hcd'];
+        types.forEach(t => {
+            soft[t] = 1;
+            hard[t] = 3;
+        });
+
+        for (const [key, noiseHistory] of Object.entries(idleData.noise)) {
+            const noise = Math.max(...noiseHistory);
+            const sigHistory = activeData.signal[key] || [0];
+            const signal = Math.max(...sigHistory);
+            const irqType = key.split('_')[1];
+            const irqNum = key.split('_')[0];
             
-            html += `<div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:4px">
-                <span style="color:var(--txh)">${name}</span>
-                <span style="color:var(--grnh)">${soft[name]}</span>
-                <span style="color:var(--amb)">${hard[name]}</span>
+            // Propose thresholds based on the max noise seen on any IRQ of this type
+            soft[irqType] = Math.max(soft[irqType], noise + 1);
+            hard[irqType] = Math.max(hard[irqType], Math.floor(signal * 0.5));
+            
+            // If noise is extremely high (>100) and signal is low, suggest ignoring it
+            const shouldIgnore = noise > 100 && (signal < noise * 2);
+            if (shouldIgnore) exclude.push(irqNum);
+
+            html += `<div style="display:grid; grid-template-columns:1.5fr 1fr 1fr 0.5fr; gap:8px; margin-bottom:4px; align-items:center">
+                <span style="color:var(--txh)">${key}</span>
+                <span style="color:var(--grnh)">+${noise}</span>
+                <span style="color:var(--amb)">~${signal}</span>
+                <input type="checkbox" class="cal-exclude" data-irq="${irqNum}" ${shouldIgnore ? 'checked' : ''} />
             </div>`;
         }
-        table.innerHTML = html;
+        table.innerHTML = html + '<p class="field__hint" style="margin-top:10px">Devices with high baseline noise (red/amber) should usually be ignored.</p>';
         
         document.getElementById('btn-apply-cal').onclick = async () => {
+            const finalExclude = Array.from(document.querySelectorAll('.cal-exclude:checked')).map(el => el.dataset.irq);
             const resp = await fetch('/calibrate/apply', {
                 method: 'POST',
                 body: new URLSearchParams({ 
                     soft: JSON.stringify(soft), 
-                    hard: JSON.stringify(hard) 
+                    hard: JSON.stringify(hard),
+                    exclude: JSON.stringify(finalExclude)
                 })
             });
             if ((await resp.json()).status === 'success') {

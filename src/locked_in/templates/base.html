@@ -116,6 +116,13 @@
         .sc__edit-form .sc__ecancel:hover{color:var(--redh)}
         .sc__work{font-family:var(--mono);font-size:11px;color:var(--grnh);font-weight:600}
 
+        /* DRAG AND DROP */
+        .sc--draggable{cursor:grab}
+        .sc--draggable:active{cursor:grabbing}
+        .sc--dragging{opacity:.35;transform:scale(.98);transition:opacity .15s,transform .15s}
+        .sc--drop-above{border-top:2px solid var(--ambh)!important;margin-top:-1px}
+        .sc--drop-below{border-bottom:2px solid var(--ambh)!important;margin-bottom:-1px}
+
         /* METRICS */
         .mbar{display:flex;gap:1px;background:var(--b1);border-radius:var(--rl);overflow:hidden;margin-bottom:16px}
         .mbar__cell{flex:1;background:var(--s1);padding:14px 16px;text-align:center}

@@ -6,6 +6,8 @@ import json
 import logging
 import re
 import statistics
+import threading
+import time
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -43,7 +45,19 @@ class LockedInWebFrontend:
         )
 
         from .idle_detector import IdleDetector
-        self._idle_detector = IdleDetector()
+        cfg_data = self._read_config_values().get("auto_pause", {})
+        self._idle_detector = IdleDetector(
+            idle_seconds=int(cfg_data.get("idle_pause_seconds", 60)),
+            soft_thresholds={
+                "i8042": int(cfg_data.get("soft_threshold_i8042", 1)),
+                "xhci_hcd": int(cfg_data.get("soft_threshold_xhci_hcd", 1)),
+            },
+            hard_thresholds={
+                "i8042": int(cfg_data.get("hard_threshold_i8042", 3)),
+                "xhci_hcd": int(cfg_data.get("hard_threshold_xhci_hcd", 10)),
+            },
+            exclude_irqs=cfg_data.get("exclude_irqs", [])
+        )
 
     def _render(self, template_name: str, **kwargs) -> str:
         template = self.jinja_env.get_template(template_name)
@@ -84,13 +98,14 @@ class LockedInWebFrontend:
 
                 if parsed.path == "/calibrate/apply":
                     soft = json.loads(form.get("soft", "{}")); hard = json.loads(form.get("hard", "{}"))
+                    exclude = json.loads(form.get("exclude", "[]"))
                     for name, val in soft.items(): frontend._update_config_value("auto_pause", f"soft_threshold_{name}", str(val))
                     for name, val in hard.items(): frontend._update_config_value("auto_pause", f"hard_threshold_{name}", str(val))
+                    frontend._update_config_value("auto_pause", "exclude_irqs", json.dumps(exclude))
                     import subprocess
-                    try:
-                        subprocess.run(["systemctl", "--user", "restart", "locked-in.service"], check=True)
-                        self._send_json({"status": "success"}, include_body=True)
-                    except: self._send_json({"status": "error"}, include_body=True)
+                    try: subprocess.run(["systemctl", "--user", "restart", "locked-in.service"], check=True)
+                    except Exception: pass  # daemon may not be running; thresholds are saved regardless
+                    self._send_json({"status": "success"}, include_body=True)
                     return
 
                 if parsed.path == "/run/pause":
@@ -167,6 +182,14 @@ class LockedInWebFrontend:
                         self._redirect("/", frontend._target_date_from_form(form), frontend._message_from_result(result), view_mode)
                     return
 
+                if parsed.path == "/task/reorder":
+                    result = frontend._reorder_task_from_form(form)
+                    if form.get("fragment") == "1":
+                        self._send_json(frontend._render_dashboard_fragments(frontend._target_date_from_form(form)), include_body=True)
+                    else:
+                        self._redirect("/", frontend._target_date_from_form(form), frontend._message_from_result(result), view_mode)
+                    return
+
                 if parsed.path == "/session/start":
                     result = frontend._start_session_from_form(form)
                     self._redirect("/", frontend._target_date_from_form(form), frontend._message_from_result(result), view_mode)
@@ -233,11 +256,58 @@ class LockedInWebFrontend:
                 self.send_response(HTTPStatus.SEE_OTHER); self.send_header("Location", location); self.send_header("Content-Length", "0"); self.end_headers()
 
         server = ThreadingHTTPServer(("127.0.0.1", self.port), Handler)
+        self._start_idle_watcher()
         try:
             print(f"Locked-In web dashboard running at http://127.0.0.1:{self.port}")
             server.serve_forever(); return 0
         except KeyboardInterrupt: return 0
         finally: server.server_close()
+
+    def _start_idle_watcher(self) -> None:
+        """Start the background idle detection thread for auto-pause/resume without the daemon."""
+        self._idle_detector.start()
+        t = threading.Thread(target=self._idle_watcher_loop, daemon=True)
+        t.start()
+
+    def _idle_watcher_loop(self) -> None:
+        """Poll idle state every second and pause/resume the active task runtime directly.
+
+        Mirrors daemon._check_idle_pause logic but runs inside the web process.
+        Uses _auto_paused_by_idle flag to avoid double-pausing and to gate resume.
+        """
+        self._idle_watcher_paused_by_us = False
+        while True:
+            time.sleep(1.0)
+            try:
+                cfg = self._read_config_values().get("auto_pause", {})
+                if not cfg.get("enabled", True):
+                    continue
+                idle_pause_secs = int(cfg.get("idle_pause_seconds", 60))
+                idle_resume_grace = int(cfg.get("idle_resume_grace_seconds", 3))
+                if idle_pause_secs <= 0:
+                    continue
+
+                today = date.today()
+                runtime = self.store.get_active_task_runtime(today)
+                if not runtime:
+                    self._idle_watcher_paused_by_us = False
+                    continue
+
+                idle_secs = self._idle_detector.seconds_since_any_activity()
+                hard_secs = self._idle_detector.seconds_since_hard_activity()
+
+                if runtime.status == "running" and not self._idle_watcher_paused_by_us:
+                    if idle_secs >= idle_pause_secs:
+                        self.store.pause_task_runtime(today, reason="idle", source="idle")
+                        self._idle_watcher_paused_by_us = True
+                        log.info("Web idle-watcher: paused after %.0fs idle", idle_secs)
+                elif runtime.status == "paused" and self._idle_watcher_paused_by_us:
+                    if hard_secs <= idle_resume_grace:
+                        self.store.resume_task_runtime(today, source="idle")
+                        self._idle_watcher_paused_by_us = False
+                        log.info("Web idle-watcher: resumed on hard activity")
+            except Exception:
+                log.exception("idle_watcher_loop error")
 
     def _target_date_from_query(self, query: dict[str, list[str]]) -> date:
         return self._parse_target_date(query.get("date", [""])[0])
@@ -287,15 +357,28 @@ class LockedInWebFrontend:
         return {"task_id": entry.task_id, "task_name": entry.task_name, "status": entry.status, "projected_start": entry.projected_start, "projected_end": entry.projected_end, "actual_start": entry.actual_start, "eta": entry.eta, "duration_minutes": entry.estimated_seconds // 60}
 
     def _read_config_values(self) -> dict[str, str]:
-        if not self.config_path or not Path(self.config_path).exists(): return {}
+        path = Path(self.config_path).expanduser() if self.config_path else Path("~/.config/locked-in/config.toml").expanduser()
+        if not path.exists(): return {}
         import sys
         if sys.version_info >= (3, 11): import tomllib
         else: import tomli as tomllib
-        return tomllib.loads(Path(self.config_path).read_text(encoding="utf-8"))
+        return tomllib.loads(path.read_text(encoding="utf-8"))
+
+    def _ensure_config_path(self) -> Path | None:
+        """Return writable config path, creating the file + parent dirs if needed."""
+        if self.config_path:
+            return Path(self.config_path)
+        default = Path("~/.config/locked-in/config.toml").expanduser()
+        default.parent.mkdir(parents=True, exist_ok=True)
+        if not default.exists():
+            default.write_text("", encoding="utf-8")
+        self.config_path = str(default)
+        return default
 
     def _update_config_value(self, section: str, key: str, value: str) -> None:
-        if not self.config_path: return
-        path = Path(self.config_path); lines = path.read_text(encoding="utf-8").splitlines()
+        path = self._ensure_config_path()
+        if not path: return
+        lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
         in_section = False
         for i, line in enumerate(lines):
             stripped = line.strip()
@@ -318,11 +401,12 @@ class LockedInWebFrontend:
                 ("schedule", "hard_shutdown_enabled"): ("bool", None, None), ("warden", "task_start_grace_seconds"): ("int", 0, 3600),
                 ("warden", "default_extend_minutes"): ("int", 0, 120), ("warden", "give_up_cooldown_seconds"): ("int", 0, 3600),
                 ("auto_pause", "idle_pause_seconds"): ("int", 0, 3600), ("auto_pause", "idle_resume_grace_seconds"): ("int", 1, 30),
+                ("auto_pause", "exclude_irqs"): ("list", None, None),
                 ("backup", "enabled"): ("bool", None, None), ("backup", "path"): ("path", None, None),
             }
             for (section, key), (typ, lo, hi) in fields.items():
                 form_key = f"{section}__{key}"; raw = form.get(form_key, "").strip()
-                if not raw and typ != "bool": continue
+                if not raw and typ not in {"bool", "list"}: continue
                 if typ == "int":
                     val = int(raw); 
                     if (lo is not None and val < lo) or (hi is not None and val > hi): return {"error": f"{key} out of range."}
@@ -330,6 +414,9 @@ class LockedInWebFrontend:
                 elif typ == "bool":
                     val = form_key in form and raw in {"on", "true", "1", "yes"}
                     self._update_config_value(section, key, "true" if val else "false")
+                elif typ == "list":
+                    items = [i.strip() for i in raw.split(",") if i.strip()]
+                    self._update_config_value(section, key, json.dumps(items))
                 elif typ == "time":
                     if not re.match(r"^\d{1,2}:\d{2}$", raw): return {"error": f"Invalid time format for {key}."}
                     self._update_config_value(section, key, f'"{raw}"')
@@ -859,4 +946,11 @@ class LockedInWebFrontend:
             if direction not in (-1, 1): return {"error": "Invalid direction"}
             if self.store.move_task(self._target_date_from_form(form), tid, direction): return {"status": "Moved"}
             return {"error": "Cannot move"}
+        except: return {"error": "Invalid params"}
+
+    def _reorder_task_from_form(self, form: dict[str, str]) -> dict:
+        try:
+            tid = int(form["task_id"]); new_pos = int(form.get("new_position", "0"))
+            if self.store.reorder_task(self._target_date_from_form(form), tid, new_pos): return {"status": "Reordered"}
+            return {"error": "Cannot reorder"}
         except: return {"error": "Invalid params"}

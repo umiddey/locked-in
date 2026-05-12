@@ -94,6 +94,11 @@ h1{font-family:var(--sans);font-size:22px;font-weight:700;color:var(--txh);margi
         <input type="number" name="auto_pause__idle_resume_grace_seconds" value="{{ config.auto_pause.idle_resume_grace_seconds }}" min="1" max="30" />
         <div class="field__hint">Seconds of activity before auto-resuming from idle pause</div>
     </div>
+    <div class="field">
+        <label class="field__label">Exclude IRQs</label>
+        <input type="text" name="auto_pause__exclude_irqs" value="{{ config.auto_pause.exclude_irqs|join(', ') }}" placeholder="e.g. 49, 12" />
+        <div class="field__hint">Comma-separated IRQ numbers to ignore (for noisy USB devices or touchpads)</div>
+    </div>
 </div>
 
 <div class="section">
@@ -128,10 +133,7 @@ h1{font-family:var(--sans);font-size:22px;font-weight:700;color:var(--txh);margi
     <div class="section__title" style="color:var(--red)">Danger Zone</div>
     <div class="field">
         <label class="field__label">Reset entire day</label>
-        <form method="post" action="/day/reset" onsubmit="return confirm('RESET ENTIRE DAY? This will delete all runs and timeline for today.')">
-            <input type="hidden" name="date" value="{{ target_date_iso }}" />
-            <button class="btn btn--red" type="submit">Reset Day</button>
-        </form>
+        <button class="btn btn--red" type="button" onclick="if(confirm('RESET ENTIRE DAY? This will delete all runs and timeline for today.')){var f=document.createElement('form');f.method='POST';f.action='/day/reset';var i=document.createElement('input');i.type='hidden';i.name='date';i.value='{{ target_date_iso }}';f.appendChild(i);document.body.appendChild(f);f.submit();}">Reset Day</button>
         <div class="field__hint">Wipe all progress for the current day and start fresh.</div>
     </div>
 </div>

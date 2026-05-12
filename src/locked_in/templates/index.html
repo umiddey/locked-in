@@ -184,4 +184,104 @@
             });
         }
     };
+
+    // Drag-and-drop reorder for pending tasks
+    (function() {
+        let draggedId = null;
+        let lastDropTarget = null;
+        let lastDropAbove = null;
+        function getDate() {
+            const inp = document.querySelector('.sc-list input[name="date"]');
+            return inp ? inp.value : '';
+        }
+        function clearDragClasses() {
+            document.querySelectorAll('.sc--dragging,.sc--drop-above,.sc--drop-below').forEach(el => {
+                el.classList.remove('sc--dragging','sc--drop-above','sc--drop-below');
+            });
+        }
+        function pendingRows() {
+            return Array.from(document.querySelectorAll('.sc-list .sc--pending'));
+        }
+        async function applyFragments(fragments) {
+            for (const [id, html] of Object.entries(fragments || {})) {
+                const el = document.getElementById(id + '-section');
+                if (el) el.innerHTML = html;
+            }
+        }
+        async function moveTaskBySteps(taskId, dateIso, direction, steps) {
+            for (let i = 0; i < steps; i++) {
+                const fd = new FormData();
+                fd.append('task_id', taskId);
+                fd.append('direction', String(direction));
+                fd.append('date', dateIso);
+                fd.append('fragment', '1');
+                const resp = await fetch('/task/move', { method: 'POST', body: fd });
+                if (!resp.ok) throw new Error('Move request failed');
+                await applyFragments(await resp.json());
+            }
+        }
+        document.addEventListener('dragstart', function(e) {
+            const row = e.target.closest('.sc--draggable');
+            if (!row) return;
+            draggedId = row.dataset.taskId;
+            lastDropTarget = null;
+            lastDropAbove = null;
+            row.classList.add('sc--dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', draggedId);
+        });
+        document.addEventListener('dragover', function(e) {
+            const target = e.target.closest('.sc');
+            if (!target || !draggedId) return;
+            if (target.dataset.taskId === draggedId) return;
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            clearDragClasses();
+            const dragging = document.querySelector('.sc--dragging');
+            if (dragging) dragging.classList.add('sc--dragging');
+            const rect = target.getBoundingClientRect();
+            const mid = rect.top + rect.height / 2;
+            lastDropTarget = target;
+            lastDropAbove = e.clientY < mid;
+            if (e.clientY < mid) target.classList.add('sc--drop-above');
+            else target.classList.add('sc--drop-below');
+        });
+        document.addEventListener('dragleave', function(e) {
+            const target = e.target.closest('.sc');
+            if (target) target.classList.remove('sc--drop-above','sc--drop-below');
+        });
+        document.addEventListener('drop', function(e) {
+            e.preventDefault();
+            if (!draggedId) return;
+            const target = e.target.closest('.sc') || lastDropTarget;
+            if (!target) { clearDragClasses(); draggedId = null; return; }
+            const rows = pendingRows();
+            const dragIdx = rows.findIndex(r => r.dataset.taskId === draggedId);
+            let targetIdx = rows.indexOf(target);
+            if (targetIdx === -1 || dragIdx === -1) { clearDragClasses(); draggedId = null; return; }
+            const rect = target.getBoundingClientRect();
+            const mid = rect.top + rect.height / 2;
+            const dropAbove = lastDropTarget === target ? lastDropAbove : e.clientY < mid;
+            let newPos = dropAbove ? targetIdx : targetIdx + 1;
+            if (dragIdx < newPos) newPos--;
+            if (newPos === dragIdx) { clearDragClasses(); draggedId = null; return; }
+            const dateIso = getDate();
+            const steps = Math.abs(newPos - dragIdx);
+            const direction = newPos > dragIdx ? 1 : -1;
+            const fd = new FormData();
+            fd.append('task_id', draggedId);
+            fd.append('new_position', String(newPos));
+            fd.append('date', dateIso);
+            fd.append('fragment', '1');
+            fetch('/task/reorder', { method: 'POST', body: fd }).then(async r => {
+                if (r.ok) {
+                    return applyFragments(await r.json());
+                }
+                return moveTaskBySteps(draggedId, dateIso, direction, steps);
+            }).catch(() => moveTaskBySteps(draggedId, dateIso, direction, steps)).finally(() => { clearDragClasses(); draggedId = null; lastDropTarget = null; lastDropAbove = null; });
+        });
+        document.addEventListener('dragend', function() {
+            clearDragClasses(); draggedId = null; lastDropTarget = null; lastDropAbove = null;
+        });
+    })();
 {% endblock %}

@@ -591,6 +591,27 @@ class SimpleTodoStore:
             self.conn.commit()
             return True
 
+    def reorder_task(self, target_date: date, task_id: int, new_position: int) -> bool:
+        """Move a task to an arbitrary position. Reindexes all positions."""
+        with self._lock:
+            target = target_date.isoformat()
+            rows = self.conn.execute(
+                "SELECT id FROM plan_tasks WHERE target_date = ? ORDER BY position ASC, id ASC",
+                (target,),
+            ).fetchall()
+            if not rows:
+                return False
+            ids = [r["id"] for r in rows]
+            cur_idx = next((i for i, rid in enumerate(ids) if rid == task_id), None)
+            if cur_idx is None:
+                return False
+            new_position = max(0, min(new_position, len(ids) - 1))
+            ids.insert(new_position, ids.pop(cur_idx))
+            for i, rid in enumerate(ids):
+                self.conn.execute("UPDATE plan_tasks SET position = ? WHERE id = ?", (i, rid))
+            self.conn.commit()
+            return True
+
     def ensure_session(self, target_date: date, started_at: datetime | None = None) -> datetime:
         with self._lock:
             target = target_date.isoformat()
@@ -1660,6 +1681,27 @@ class SimpleTodoStore:
                 )
                 for row in rows
             ]
+
+    def get_cumulative_work_seconds(self, target_date: date, now: datetime | None = None) -> float:
+        """Return the total work seconds accumulated for a day.
+
+        Args:
+            target_date (date): Day to inspect.
+            now (datetime | None): Optional reference time for open blocks.
+
+        Returns:
+            float: Total work seconds across finished and open work blocks.
+        """
+        with self._lock:
+            current_time = now or datetime.now()
+            total = 0.0
+            for block in self.get_time_blocks(target_date):
+                if block.block_type != "work":
+                    continue
+                start = datetime.fromisoformat(block.started_at)
+                end = datetime.fromisoformat(block.ended_at) if block.ended_at else current_time
+                total += max((end - start).total_seconds(), 0.0)
+            return total
 
     def get_task_detail(self, plan_task_id: int) -> dict | None:
         """Full detail for a single task: metadata, timeline of work/pause blocks, events, runtime summary.

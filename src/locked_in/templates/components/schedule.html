@@ -61,7 +61,7 @@
                     </div>
                 {% else %}
                     {# STANDARD ROW VIEW #}
-                    <div class="sc {{ entry.cls }}" data-task-id="{{ entry.task_id }}" data-status="{{ entry.status }}">
+                    <div class="sc {{ entry.cls }}{% if entry.status == 'pending' and not historical_view %} sc--draggable{% endif %}" data-task-id="{{ entry.task_id }}" data-status="{{ entry.status }}"{% if entry.status == 'pending' and not historical_view %} draggable="true"{% endif %}>
                         <div class="sc__time">{{ entry.t0 }}<span class="sc__sep">&mdash;</span>{{ entry.t1 }}</div>
                         <div class="sc__body">
                             <div class="sc__name">

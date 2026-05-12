@@ -4,7 +4,6 @@ import logging
 import os
 import re
 import subprocess
-import time
 from datetime import date, datetime, timedelta
 from queue import Queue, Empty
 
@@ -49,7 +48,6 @@ class Daemon:
         self.schedule: list[ScheduleItem] = []
         self.current_item: ScheduleItem | None = None
         self._task_rows: dict[str, int] = {}  # schedule item id -> db task id
-        self._task_started_at: datetime | None = None
         self.session: Session | None = None
         self._interruption: Interruption | None = None
         self._give_up_attempts: int = 0
@@ -57,7 +55,6 @@ class Daemon:
         self._bootstrap_error: str | None = None
         self._next_bootstrap_retry_at: datetime | None = None
         self._shutdown_warning_until: datetime | None = None
-        self._item_finish_due_at: datetime | None = None
         
         self.event_queue = Queue()
         
@@ -74,7 +71,8 @@ class Daemon:
         self._idle_detector = IdleDetector(
             idle_seconds=config.auto_pause.idle_pause_seconds,
             soft_thresholds=soft_thresh,
-            hard_thresholds=hard_thresh
+            hard_thresholds=hard_thresh,
+            exclude_irqs=config.auto_pause.exclude_irqs,
         )
         self._mic_detector = MicActivityDetector(
             config.auto_pause.call_apps,
@@ -173,8 +171,11 @@ class Daemon:
             self._running = False
             return
 
-        if self._stretch_lockout: self._stretch_lockout.tick()
         now = datetime.now()
+        today = date.today()
+
+        if self._stretch_lockout:
+            self._stretch_lockout.tick(self.store.get_cumulative_work_seconds(today, now))
 
         if self.session is None:
             if self._next_bootstrap_retry_at is None or now >= self._next_bootstrap_retry_at:
@@ -211,6 +212,50 @@ class Daemon:
         """Read active work block ID from store (single source of truth)."""
         rt = self.store.get_active_task_runtime(today)
         return rt.active_work_block_id if rt else None
+
+    def _project_runtime_schedule(self, now: datetime):
+        """Return the store-derived runtime projection for today."""
+        return self.store.project_runtime_schedule(date.today(), now)
+
+    def _find_schedule_item(self, task_id: int) -> ScheduleItem | None:
+        """Return the in-memory schedule item for a task id."""
+        for item in self.schedule:
+            if item.kind == ScheduleKind.TASK and item.task_ref and int(item.task_ref.id) == task_id:
+                return item
+        return None
+
+    def _current_task_started_at(self, now: datetime) -> datetime:
+        """Resolve the current task start time from persisted state.
+
+        Args:
+            now (datetime): Fallback timestamp if no persisted value exists.
+
+        Returns:
+            datetime: Persisted start timestamp or the fallback timestamp.
+        """
+        if not self.current_item or not self.current_item.task_ref:
+            return now
+
+        task_row_id = self._task_rows.get(id(self.current_item))
+        if task_row_id:
+            row = self.db.conn.execute(
+                "SELECT actual_start FROM tasks WHERE id = ?",
+                (task_row_id,),
+            ).fetchone()
+            if row and row["actual_start"]:
+                try:
+                    return datetime.fromisoformat(row["actual_start"])
+                except ValueError:
+                    pass
+
+        runtime = self.store.get_active_task_runtime(date.today())
+        if runtime and runtime.plan_task_id == int(self.current_item.task_ref.id) and runtime.started_at:
+            try:
+                return datetime.fromisoformat(runtime.started_at)
+            except ValueError:
+                pass
+
+        return now
 
     def _handle_hard_activity(self, now: datetime):
         if self.sm.state != State.PAUSED or not self._auto_paused_by_idle:
@@ -285,19 +330,23 @@ class Daemon:
             notify("Locked-In", f"Hard shutdown in {self.config.schedule.shutdown_warning_minutes} min.", "critical")
 
     def _check_schedule(self, now: datetime):
-        if self.current_item is None or self.sm.state in (State.IDLE, State.AWAITING_TASK_START, State.TASK_ACTIVE):
-            for item in self.schedule:
-                if now >= item.scheduled_start:
-                    if item.kind == ScheduleKind.SHUTDOWN_WARNING:
-                        notify("Locked-In", f"WARNING: Shutdown in {self.config.schedule.shutdown_warning_minutes} min!", "critical")
-                        self.schedule.remove(item); break
-                    if item.kind == ScheduleKind.SHUTDOWN: self._shutdown(); return
-                    if self.current_item != item: self._activate_item(item)
-                    break
-        if self.current_item and self._item_finish_due_at and now >= self._item_finish_due_at and self.sm.state == State.TASK_ACTIVE:
-            self._on_item_finished()
+        if self.session and self.config.schedule.hard_shutdown_enabled and now >= self.session.shutdown_deadline:
+            self._shutdown()
             return
-        if self.session and self.config.schedule.hard_shutdown_enabled and now >= self.session.shutdown_deadline: self._shutdown()
+
+        if self.current_item and self.sm.state == State.TASK_ACTIVE:
+            rt = self.store.get_active_task_runtime(date.today())
+            if rt and rt.status == "running" and now >= rt.compute_eta(now):
+                self._on_item_finished()
+            return
+
+        if self.sm.state in (State.IDLE, State.AWAITING_TASK_START, State.TASK_ACTIVE):
+            projection = self._project_runtime_schedule(now)
+            next_pending = next((entry for entry in projection if entry.status == "pending"), None)
+            if next_pending and next_pending.projected_start and now >= datetime.fromisoformat(next_pending.projected_start):
+                item = self._find_schedule_item(next_pending.task_id)
+                if item and self.current_item != item:
+                    self._activate_item(item)
 
     def _start_session(self, plan):
         now = datetime.now(); today = date.today()
@@ -324,10 +373,9 @@ class Daemon:
         if not existing_runtime or existing_runtime.status not in ("running", "paused") or self.current_item is not None: return
         target_id = str(existing_runtime.plan_task_id)
         is_paused = existing_runtime.status == "paused"
-        started_dt = datetime.fromisoformat(existing_runtime.started_at)
 
         def _apply_recovery(item):
-            self.current_item = item; self._task_started_at = started_dt; self._item_finish_due_at = existing_runtime.compute_eta()
+            self.current_item = item
             self.sm.transition(State.AWAITING_TASK_START)
             if is_paused:
                 self.sm.transition(State.TASK_ACTIVE); self.sm.transition(State.PAUSED)
@@ -341,6 +389,7 @@ class Daemon:
                 _apply_recovery(item); return
         plan = self.store.get_plan(today); plan_task = next((pt for pt in plan.tasks if str(pt.id) == target_id), None) if plan else None
         if plan_task:
+            started_dt = datetime.fromisoformat(existing_runtime.started_at)
             synthetic = ScheduleItem(kind=ScheduleKind.TASK, title=plan_task.task_name, scheduled_start=started_dt, duration_minutes=max(1, int(existing_runtime.estimated_seconds / 60)), task_ref=NormalizedTask(id=str(plan_task.id), title=plan_task.task_name, normalized_key=plan_task.task_name.lower().strip(), estimate_minutes=plan_task.duration_minutes, due_date=today))
             self.schedule.insert(0, synthetic)
             _apply_recovery(synthetic)
@@ -394,7 +443,7 @@ class Daemon:
                     self._auto_chain_next = True
                     notify("Locked-In", f"Auto-continue ON — will start next task after {name}")
                 elif decision == DECISION_FINISH:
-                    self.store.finish_task_runtime(today); notify("Locked-In", f"Finished: {name}")
+                    notify("Locked-In", f"Will finish at scheduled time: {name}")
                 elif decision == DECISION_EXTEND:
                     self.store.extend_task_runtime(today, ext_min * 60)
                     self._eta_warning_shown_for = None; self._next_task_notified_for = None
@@ -415,17 +464,17 @@ class Daemon:
 
     def _on_confirmed(self):
         if not self.current_item: return
-        self.sm.transition(State.TASK_ACTIVE); self._task_started_at = datetime.now(); self._stretch_lockout.start() if self._stretch_lockout else None
+        started_at = datetime.now()
+        self.sm.transition(State.TASK_ACTIVE); self._stretch_lockout.start() if self._stretch_lockout else None
         task_row_id = self._task_rows.get(id(self.current_item))
-        if task_row_id: self.db.update_task(Task(id=task_row_id, status=TaskStatus.ACTIVE, actual_start=self._task_started_at))
+        if task_row_id: self.db.update_task(Task(id=task_row_id, status=TaskStatus.ACTIVE, actual_start=started_at))
         if self.current_item.task_ref:
             # Check if store already has an active work block (e.g. web-started task)
             today = date.today()
             rt = self.store.get_active_task_runtime(today)
             if not (rt and rt.active_work_block_id):
-                self.store.start_time_block(today, "work", session_id=self.tracking_session_id, plan_task_id=int(self.current_item.task_ref.id), source="daemon", started_at=self._task_started_at, metadata={"title": self.current_item.title})
-            self.store.log_event(today, "task_started", session_id=self.tracking_session_id, plan_task_id=int(self.current_item.task_ref.id), source="daemon", occurred_at=self._task_started_at, metadata={"title": self.current_item.title})
-        self._item_finish_due_at = datetime.now() + timedelta(minutes=self.current_item.duration_minutes)
+                self.store.start_time_block(today, "work", session_id=self.tracking_session_id, plan_task_id=int(self.current_item.task_ref.id), source="daemon", started_at=started_at, metadata={"title": self.current_item.title})
+            self.store.log_event(today, "task_started", session_id=self.tracking_session_id, plan_task_id=int(self.current_item.task_ref.id), source="daemon", occurred_at=started_at, metadata={"title": self.current_item.title})
 
     def _pause_session(self, kind: str = "pause", message: str = "Paused"):
         if self.sm.state == State.PAUSED: return {"status": "already_paused"}
@@ -453,24 +502,28 @@ class Daemon:
             if self._daemon_pause_block_id: self.store.finish_time_block(self._daemon_pause_block_id, ended_at=now); self._daemon_pause_block_id = None
             if self._previous_state_before_pause == "task_active" and self.current_item and self.current_item.task_ref:
                 self.store.start_time_block(today, "work", session_id=self.tracking_session_id, plan_task_id=int(self.current_item.task_ref.id), source="daemon", started_at=now, metadata={"title": self.current_item.title})
-            shift = timedelta(seconds=pause_sec)
-            for item in self.schedule: item.scheduled_start += shift
-            if self._item_finish_due_at: self._item_finish_due_at += shift
         notify("Locked-In", "Resumed"); return {"status": "resumed", "previous_state": prev.value if prev else None, "pause_seconds": pause_sec}
 
     def _on_item_finished(self):
         if not self.current_item: return
-        now = datetime.now(); today = date.today(); self._item_finish_due_at = None
+        now = datetime.now(); today = date.today()
         should_chain = self._auto_chain_next
         if self._stretch_lockout: self._stretch_lockout.pause()
+        runtime = self.store.get_active_task_runtime(today)
+        if runtime:
+            try:
+                self.store.finish_task_runtime(today, outcome="finished", notes="")
+            except ValueError:
+                runtime = None
         task_row_id = self._task_rows.get(id(self.current_item))
-        if task_row_id and self._task_started_at: self.db.update_task(Task(id=task_row_id, actual_end=now, actual_minutes=(now - self._task_started_at).total_seconds() / 60, status=TaskStatus.COMPLETED))
-        # Read active work block from store (single source of truth)
-        work_block_id = self._get_active_work_block_id(today)
-        if work_block_id: self.store.finish_time_block(work_block_id, ended_at=now)
-        if self.current_item.task_ref: self.store.log_event(today, "task_finished", session_id=self.tracking_session_id, plan_task_id=int(self.current_item.task_ref.id), source="daemon", occurred_at=now, metadata={"title": self.current_item.title})
+        started_at = self._current_task_started_at(now)
+        if task_row_id: self.db.update_task(Task(id=task_row_id, actual_end=now, actual_minutes=(now - started_at).total_seconds() / 60, status=TaskStatus.COMPLETED))
+        if not runtime and self.current_item.task_ref:
+            # Fallback for daemon-started tasks that do not have a task_runtime row.
+            work_block_id = self._get_active_work_block_id(today)
+            if work_block_id: self.store.finish_time_block(work_block_id, ended_at=now)
+            self.store.log_event(today, "task_finished", session_id=self.tracking_session_id, plan_task_id=int(self.current_item.task_ref.id), source="daemon", occurred_at=now, metadata={"title": self.current_item.title})
         finished_item = self.current_item
-        self._task_started_at = None
         if finished_item in self.schedule: self.schedule.remove(finished_item)
         self.current_item = None; self._next_task_notified_for = None; self._auto_chain_next = False
         if self._window: self._window.close(); self._window = None
@@ -533,7 +586,28 @@ class Daemon:
             self.store.get_or_start_session_v2(target, source="daemon")
             rt = self.store.start_task_runtime(target, plan_task_id, source="daemon")
         except Exception as e: return {"error": str(e)}
-        if self.sm.state not in (State.GIVEN_UP, State.FINISHED): self.sm.transition(State.TASK_ACTIVE); self._task_started_at = datetime.now(); self._stretch_lockout.start() if self._stretch_lockout else None
+        if self.sm.state not in (State.GIVEN_UP, State.FINISHED):
+            self.current_item = self._find_schedule_item(plan_task_id)
+            if self.current_item is None:
+                row = self.store.conn.execute(
+                    "SELECT task_name, duration_minutes FROM plan_tasks WHERE id = ?",
+                    (plan_task_id,),
+                ).fetchone()
+                if row:
+                    self.current_item = ScheduleItem(
+                        kind=ScheduleKind.TASK,
+                        title=row["task_name"],
+                        scheduled_start=datetime.now(),
+                        duration_minutes=row["duration_minutes"],
+                        task_ref=NormalizedTask(
+                            id=str(plan_task_id),
+                            title=row["task_name"],
+                            normalized_key=_normalize_key(row["task_name"]),
+                            estimate_minutes=row["duration_minutes"],
+                            due_date=target,
+                        ),
+                    )
+            self.sm.transition(State.TASK_ACTIVE); self._stretch_lockout.start() if self._stretch_lockout else None
         return {"status": "started", "runtime_id": rt.id, "task_name": self.conn_task_name(plan_task_id)}
 
     def conn_task_name(self, plan_task_id: int) -> str:
@@ -557,7 +631,14 @@ class Daemon:
     def _handle_finish_task(self, cmd: dict) -> dict:
         try: rt = self.store.finish_task_runtime(date.today(), outcome=cmd.get("outcome", "finished"), notes=cmd.get("notes", ""))
         except Exception as e: return {"error": str(e)}
-        if self.sm.state not in (State.GIVEN_UP, State.FINISHED): self.sm.transition(State.AWAITING_TASK_START); self._stretch_lockout.pause() if self._stretch_lockout else None; self._next_task_notified_for = None
+        if self.sm.state not in (State.GIVEN_UP, State.FINISHED):
+            self.sm.transition(State.AWAITING_TASK_START)
+            self._stretch_lockout.pause() if self._stretch_lockout else None
+            self._next_task_notified_for = None
+            self._auto_chain_next = False
+            if self.current_item in self.schedule:
+                self.schedule.remove(self.current_item)
+            self.current_item = None
         return {"status": "finished", "runtime_id": rt.id}
 
     def _handle_extend_task(self, cmd: dict) -> dict:
@@ -570,7 +651,7 @@ class Daemon:
 
     def _build_status(self) -> dict:
         now = datetime.now(); today = date.today(); runtime = self.store.get_active_task_runtime(today)
-        idx = next((i for i, item in enumerate(self.schedule) if item is self.current_item), None)
-        nxt = self.schedule[idx + 1] if idx is not None and idx + 1 < len(self.schedule) else None
+        projection = self._project_runtime_schedule(now)
+        nxt = next((entry for entry in projection if entry.status == "pending"), None)
         rt_payload = {"id": runtime.id, "status": runtime.status, "eta": runtime.compute_eta(now).isoformat(timespec="seconds")} if runtime else None
-        return {"state": self.sm.state.value, "session_status": self.session.status.value if self.session else None, "task_runtime": rt_payload, "current_item": {"title": self.current_item.title, "kind": self.current_item.kind.value} if self.current_item else None, "next_item": {"title": nxt.title, "kind": nxt.kind.value} if nxt else None, "remaining_items": len(self.schedule), "auto_paused_by_mic": self._auto_paused_by_mic, "auto_chain_next": self._auto_chain_next, "bootstrap_error": self._bootstrap_error}
+        return {"state": self.sm.state.value, "session_status": self.session.status.value if self.session else None, "task_runtime": rt_payload, "current_item": {"title": self.current_item.title, "kind": self.current_item.kind.value} if self.current_item else None, "next_item": {"title": nxt.task_name, "kind": "task"} if nxt else None, "remaining_items": len([entry for entry in projection if entry.status in ("pending", "running", "paused")]), "auto_paused_by_mic": self._auto_paused_by_mic, "auto_chain_next": self._auto_chain_next, "bootstrap_error": self._bootstrap_error}
